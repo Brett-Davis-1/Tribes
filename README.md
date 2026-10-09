@@ -19,7 +19,7 @@ The game can be restarted using `Start Tribes.cmd` on Windows. Leave the server 
 - Movement, building, resting, attacking, settlement income, public population commitments, biome defense, city upgrades, held Settlement/City victories and immediate Science/Kingmaker victories.
 - The supplied Kn Tree - Current (5).png knowledge tree, with confirmed 2D6 Archery/Shields upgrades, including free actions, teleportation, immediate yields, defensive/offensive upgrades and one-time rewards.
 - Six spirit card types, including targeted technology theft and Guardian Turtle's defensive response window.
-- Distinct computer research strategies, two difficulty settings, fast turns, a chronicle, and local save/resume.
+- Three difficulty settings (Relaxed, Standard, Hard), fast turns, a chronicle, and local save/resume. Hard uses victory planning, public combat odds, resource reserves and claim interception without resource or dice bonuses.
 - Responsive interface, reduced-motion support and animated leader movement.
 
 ## Provisional rules to confirm
@@ -50,6 +50,12 @@ Turn-start income is recorded separately from the preceding player's end-turn ac
 Earlier-rules saves remain available for audit export but cannot resume under rules edition 2. Older audits retain their original ruleset; saves made before recording began remain explicitly partial. Start a new match to record every action from setup onward. Export filenames include a unique game ID and the event count. File timestamps are UTC; the history screen shows Central Time.
 
 ## Verification details
+
+Open `http://127.0.0.1:4178/?difficulty=hard` to preselect Hard for a new match. Existing saved matches retain their original difficulty. The in-game header shows the current bot difficulty, and exported audits record it. Hard's policy is documented in RULES.md under AI-07. Run `node hard-bot-benchmark.mjs` for the reproducible 120-duel comparison against Standard.
+
+Hard was updated October 9 with six leader playstyles based on Brett's own games (RULES.md AI-08). Refresh the browser to load it, and begin a new Hard match for a clean comparison. New bot actions include `botPolicy: leader-playstyles-2026-10-09` in audit details. Run `node leader-bot-benchmark.mjs` for 72 duels against the previous Hard policy plus 36 paired three-player setups; the previous policy is preserved in `bot-history/hard-v1.mjs`. The initial benchmark gave the new policy 61/72 duel wins and moved Ku's average first attack from round 5.42 to 1.67 among games where Ku attacked.
+
+Run `node hard-bot-audit.mjs --games=200` for a larger self-play audit: 200 setups at each of 2, 3 and 4 players, each replayed with all-current and all-previous Hard bots (1,200 matches). Timestamped results go into `bot-audits/`, including a Markdown report, per-game and per-player JSON summaries, and a compressed full action/resource audit for each current-bot game. The report separates lobby sizes, records attacks per player turn and claim interruptions, and compares leader wins with their expected share of wins given lobby size. These simulations do not touch browser saves or change game rules. `--seed-offset=2001` controls the reproducible seed series.
 
 Run `node --test tests.mjs` (or `npm test`). The suite covers tile selection, map connectivity, illegal actions, income timing, combat ties, city capture, defensive spirit timing, public population commitments, rest limits, all four victories, the entire supplied technology table, dice upgrades, save compatibility, theft, hidden-information isolation, and 18 complete seeded simulations across all leaders.
 

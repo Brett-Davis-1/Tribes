@@ -1,11 +1,11 @@
 # Tribes of the Lost Island — Living Rules
 
-**Document version:** 2.0  
+**Document version:** 2.1  
 **Baseline date:** October 8, 2026 (America/Chicago)  
 **Implemented ruleset ID:** `tribes-rules-2`  
 **Scope:** The current playable browser game, including its computer opponents.
 
-**Latest update:** Rules edition 2 is implemented. The technology source is `Kn Tree - Current (5).png`, with Brett’s explicit dice clarification: base D6 + D4; Archery and Shields give 2D6. The Armor proposal is withdrawn. New matches use these rules; earlier saves remain available for audit export.
+**Latest update:** October 9, 2026: Hard bots now have leader-specific priorities informed by Brett's six playtests, value profitable raids, and prioritize reachable claim interceptions. Bot policy: `leader-playstyles-2026-10-09`. The underlying rules remain edition 2, using `Kn Tree - Current (5).png` and Brett's explicit dice clarification: base D6 + D4; Archery and Shields give 2D6.
 
 This is our working reference for auditing and changing the video game. It describes the implementation as it exists, including assumptions and known differences from the supplied board-game materials. Documenting a behavior does not mean you have approved it as a final design decision.
 
@@ -318,7 +318,7 @@ These are digital strategy settings, not restrictions on human play. All persona
 
 **AI-03 — Difficulty.** Standard attempts eligible priority research whenever this step is reached. Relaxed has a 55% chance to attempt it at each decision where it is eligible. This is checked per decision, not once per turn. Difficulty changes no resource costs, dice, starting resources or victory thresholds. Fast turns changes animation/decision delays only.
 
-**AI-04 — Decision priority.** Re-evaluate after each action, in this order:
+**AI-04 — Standard / Relaxed decision priority.** Re-evaluate after each action, in this order:
 
 1. In combat, use the public commitment policy below; confirm Guardian Turtle when defending with one in hand.
 2. If normal card allowance remains, use Fighting Tiger against the first rival city or settlement belonging to a rival with a pending Settler claim.
@@ -346,6 +346,27 @@ For an affordable enemy target, add 24 if it is a city and 16 if its owner has a
 The AI uses these heuristics, not a full strategic search or an external AI service. It may make weak decisions. If an attempted AI action is rejected, the interface reports it and attempts to pass the turn rather than repeatedly retrying.
 
 **AI-06 — Public combat spending.** Reserve 2 population for Conquerors or 4 for other personalities; the remaining even amount is the maximum bid. Increase the current bid enough to match the opponent’s current total modifiers when defending, or exceed them by 1 when attacking, up to that budget. The AI only raises, never automatically lowers, so counteroffers terminate within its finite population budget. When no raise is needed or affordable, confirm. A defending AI with Turtle confirms it instead of raising. This policy uses public commitments and modifiers, not hidden cards or future rolls. Human players may raise or lower their proposals.
+
+**AI-07 — Hard difficulty (added October 8, 2026).** Hard changes computer decisions only. It has the same starting resources, income, AP, dice, costs and victory conditions as the player. It uses public positions, technology, resource balances, commitments and revealed yields plus its own hand. It cannot inspect rival hands, hidden tile yields or future random rolls. Select Hard when starting a new game; resuming a saved match keeps that match's difficulty. Audits export the selected difficulty.
+
+Hard evaluates routes after every action. Starting positions consider affordability, nearby cheap spaces and leader preferences. Ku favors proximity for early raids; economic leaders put more value on affordable richer biomes. Unrevealed yields use biome averages, never their actual hidden values. Capture value includes income gained and denied, Spoils and Spirit Favor rewards, and progress toward six settlements. Bots consider combat improvements before an immediately reachable raid. At 30 or more knowledge, if two turns of current income can reach 40, they stop buying research to preserve a Science victory. They immediately use Owl at 36 knowledge or rest at 39 when legal.
+
+**AI-08 — Leader playstyles (October 9, 2026).** The six supplied human audits inform preferences rather than fixed move sequences. Every leader adapts to the public position and can take a favorable attack or alternative victory.
+
+| Leader | Playtest influence and bot priorities |
+| --- | --- |
+| Ku Nuele | Early raids; Spoils and Ferocity, followed by Spiritual/Favor and Archery. More willing to invest population in profitable attacks. |
+| Asinya | Use starting population to establish an economy; Spiritual, New Followers and Wisdom; knowledge income, mobility, Shields and a City finish. |
+| Herysi | Spirit Offering, Fertility and Harvest, then War Tribe; population income supports later conquest and defense. |
+| Hecatl | Wayfinder, Tent Culture and Stamina for expansion; save the teleport for a rival claim or a potential victory of its own; develop combat afterward. |
+| Tao Zhe | New Followers and Wisdom, valuable population income, then Hunter/Spoils/Favor and stronger combat; use both spirit plays and buy cards with surplus population. |
+| Daikotei | Use starting spirits, acquire mobility and discounted building, then Hunter/Spoils/Ferocity for selective raids; support later attacks with defensive research and cards. |
+
+Hard prioritizes interceptions that can actually produce an attack this turn, using Tiger, Wayfinder, Eagle or Jaguar when available. A reachable defended settlement can take priority over an unreachable weak one. When several players have pending victories, earlier winning turns take priority. Bots may research mobility when it makes an interception possible now. They steal technologies based on their cost and contribution to the leader's plan. City placement considers nearby rivals and remaining defensive population. When holding a city, a bot tries to station its leader there, rests, and may buy cards from surplus population for a Turtle defense. These are strategic estimates, not a guarantee that every rival claim can be stopped.
+
+Hard combat enumerates all possible dice totals, including defense winning ties. For an ordinary battle it reserves half its population income, rounded down and limited to 4–10 population (2–10 for Ku); for a city, pending Settler claim, or attack by a tribe already holding at least five settlements, it can commit all its population. It chooses the affordable even bid maximizing estimated win probability times the value of the location, minus population spent. Bids only increase, so automatic counteroffers terminate. A defending bot with Turtle confirms it. The policy uses the current public offer, and does not predict or read the next dice roll.
+
+Hard remains a heuristic opponent. `leader-bot-benchmark.mjs` compares the new policy with the preserved previous Hard policy: 72 duels with seats swapped and 36 paired three-player setups. The initial comparison produced 61/72 duel wins for the new policy; average ending round in the three-player games increased from 6.75 to 12.72. These are bot results, not a prediction of human difficulty. `hard-bot-benchmark.mjs` also supports comparison against Standard. New computer actions record their policy identifier in audit details so resumed games can distinguish later decisions from earlier ones.
 
 ## 15. Audit records and saves
 
@@ -399,6 +420,7 @@ Useful change-request format: **Rule ID / proposed value or behavior / reason / 
 | 1.3 | October 8, 2026 | tribes-first-playable-audit-1 | Confirmed separate City research and upgrade costs; replaced Science cards with 40 held knowledge; recorded immediate Science/Kingmaker victories and held City/Settlement victories. Kingmaker requires preventing two different cities; its precise prevention event awaits clarification. New knowledge tree will supply technology revisions. | No — victory clarification recorded |
 
 | 2.0 | October 8, 2026 | tribes-rules-2 | Applied the latest tree, withdrawn Armor, explicit 2D6 upgrades, pooled biomes, new starts, public combat spending, no exhaustion, common rest, Science and Kingmaker. Updated interface, AI, audits and save compatibility. | Yes |
+| 2.1 | October 9, 2026 | tribes-rules-2 | Added six Hard leader playstyles based on Brett's audits, more valuable raids, reachable claim interceptions, and policy labels on computer audit events. | AI decisions only; rules and costs unchanged |
 
 ### Implementation index
 

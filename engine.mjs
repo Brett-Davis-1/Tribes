@@ -105,6 +105,7 @@ export function act(s,a){
  if(!s.audit){initializeAudit(s,before,{leaders:LEADERS,technologies:TECHS,cards:CARDS,assumptions:['Legacy match: original setup seed and earlier actions are unavailable.']},{legacy:true});}
  const after=auditState(s),markerIndex=s.log.indexOf(marker),messages=s.log.slice(0,markerIndex<0?s.log.length:markerIndex).map(e=>e.text).reverse();
  if(a.type==='resolve')details.result=structuredClone(s.result);
+ if(a.botPolicy)details.botPolicy=a.botPolicy;
  recordAudit(s,{type:a.type==='resolve'?'combat_result':a.type,actor,before,after,description:messages.join(' ')||`${leader(s.players[actor]).name} ends their turn.`,details,action:a});
  const startsTurn=(before.phase==='draft'&&s.phase==='playing')||(a.type==='end'&&s.phase==='playing');
  if(startsTurn){
@@ -210,7 +211,203 @@ function applyAction(s,a){
  syncClaims(s);return {ok:true};
 }
 export function route(s,p,target){const queue=[[p.pos]],seen=new Set([p.pos]);while(queue.length){const path=queue.shift(),id=path.at(-1);if(id===target)return path;for(const n of neighbors(s,p,id))if(!seen.has(n)){seen.add(n);queue.push([...path,n]);}}return [];}
+
+// Hard bots evaluate public state and their own hand. They never sample the game
+// RNG to plan, inspect opponents' cards, or read an unrevealed tile's yield.
+export const HARD_BOT_VERSION='leader-playstyles-2026-10-09';
+// Preferences learned from Brett's six leader playtests, not scripted move replays.
+const HARD_STYLES={
+ ku:{raid:1.35,city:.75,pop:1,kn:1,opening:['spoils','ferocity'],research:['spiritual','favor','archery','nomad','stamina','growth','wartribe']},
+ asinya:{raid:.9,city:1.2,pop:1,kn:1.4,opening:['spiritual','growth','wisdom'],research:['nomad','wayfinder','stamina','shields','city']},
+ herysi:{raid:1.05,city:.8,pop:1.35,kn:1,opening:['offering','fertility','harvest'],research:['wartribe','hunter','spoils','ferocity','spiritual','favor','growth']},
+ hecatl:{raid:1,city:.8,pop:1.15,kn:1,opening:['wayfinder','tent','stamina'],research:['hunter','spoils','ferocity','city']},
+ tao:{raid:1.1,city:.85,pop:1.4,kn:1,opening:['growth','wisdom'],research:['hunter','spoils','favor','ferocity','wartribe','nomad','stamina']},
+ daikotei:{raid:1.2,city:.85,pop:1.15,kn:1,opening:['nomad','wayfinder','tent','stamina'],research:['hunter','spoils','ferocity','gatherer','offering','archery']}
+};
+const hardStyle=p=>HARD_STYLES[p.leader];
+function battleReserve(s,p,critical=false){return critical?0:Math.min(10,Math.max(p.leader==='ku'?2:4,Math.floor(income(s,p).pop/2)));}
+const oddsCache=new Map();
+function attackOdds(a,d,attack,defense){
+ const as=diceSides(a),ds=diceSides(d,true),gap=attack-defense,key=`${as[1]}:${ds[1]}:${gap}`;
+ if(oddsCache.has(key))return oddsCache.get(key);
+ let wins=0,total=0;
+ for(let x=1;x<=as[0];x++)for(let y=1;y<=as[1];y++)for(let z=1;z<=ds[0];z++)for(let w=1;w<=ds[1];w++){total++;if(x+y+gap>z+w)wins++;}
+ const odds=wins/total;oddsCache.set(key,odds);return odds;
+}
+function publicBattle(s,p,t){return {attacker:p.id,defender:t.owner,tile:t.id,offers:{[p.id]:0,[t.owner]:0}};}
+function urgentTile(s,t){return t.city||s.players[t.owner]?.claim.settler!==null&&t.owner!==null;}
+function hardBattleAction(s,id){
+ const b=s.battle,p=s.players[id],defending=id===b.defender,t=s.tiles[b.tile];
+ if(b.ready[id])return null;
+ const a=s.players[b.attacker],d=s.players[b.defender],mods=combatBonuses(s);
+ if(defending&&p.cards.includes('turtle'))return {type:'battleReady',player:id,turtle:true};
+ const critical=urgentTile(s,t)||owned(s,a).length>=5;
+ const reserve=battleReserve(s,p,critical);
+ const max=Math.max(b.offers[id],Math.floor(Math.max(0,p.pop-reserve)/2)*2);
+ const value=critical?1000:12+t.biome*3+(t.revealed?t.yield.amount*2:0);
+ const current=b.offers[id],chance=bid=>{
+  const win=attackOdds(a,d,mods.attack+(defending?0:(bid-current)/2),mods.defense+(defending?(bid-current)/2:0));return defending?1-win:win;
+ };
+ let best=current,bestScore=value*chance(current)-current;
+ // Monotonic offers prevent automatic counteroffer cycles. Stop spending at the
+ // smallest bid with the best expected result, including the defender's tie edge.
+ for(let bid=current+2;bid<=max;bid+=2){const score=value*chance(bid)-bid;if(score>bestScore+.001){best=bid;bestScore=score;}}
+ return best>current?{type:'battleOffer',player:id,population:best}:{type:'battleReady',player:id};
+}
+function cityResearchPath(p,id='city'){
+ if(has(p,id))return {cost:0,ids:[]};
+ const t=TECHS.find(t=>t.id===id),parent=t.parents.map(id=>cityResearchPath(p,id)).sort((a,b)=>a.cost-b.cost)[0]||{cost:0,ids:[]};
+ return {cost:parent.cost+t.cost,ids:[...parent.ids,id]};
+}
+function leaderResearch(p){
+ const style=hardStyle(p),goal=[...style.opening,...style.research].find(id=>!has(p,id));
+ return goal?cityResearchPath(p,goal).ids[0]:null;
+}
+function raidEstimate(s,p,t,critical=false){
+ const d=s.players[t.owner],mods=combatBonuses(s,publicBattle(s,p,t));
+ const max=Math.floor(Math.max(0,p.pop-battleReserve(s,p,critical))/2)*2;
+ const defense=Math.floor(Math.max(0,d.pop-battleReserve(s,d,critical))/2);
+ const reward=65*hardStyle(p).raid+(t.revealed?t.yield.amount*6:0)+(has(p,'spoils')?8:0)+(has(p,'favor')?12:0);
+ let best={chance:0,spend:0,value:-Infinity};
+ for(let spend=0;spend<=max;spend+=2){
+  const chance=attackOdds(p,d,mods.attack+spend/2,mods.defense+defense),value=(critical?1000:reward)*chance-spend;
+  if(value>best.value)best={chance,spend,value};
+ }
+ return best;
+}
+// Only pursue a last-chance interception if an attack can happen before the
+// claimant's next turn. A weak reachable target beats a distant easy target.
+function interceptClaim(s,p,threats,card){
+ const options=threats.map(t=>{
+  const path=route(s,p,t.id),distance=path.length-1;
+  const travel=distance&&(p.teleports||card('eagle'))?0:distance;
+  const attempts=card('tiger')?1+p.ap:Math.max(0,p.ap+(card('jaguar')?2:0)-travel);
+  const chance=raidEstimate(s,p,t,true).chance;
+  return {t,path,distance,attempts,deadline:(s.order.indexOf(t.owner)-s.turnIndex+s.order.length)%s.order.length,
+   score:1-(1-chance)**attempts};
+ }).filter(o=>o.attempts>0).sort((a,b)=>a.deadline-b.deadline||b.score-a.score||a.distance-b.distance);
+ const best=options[0];if(!best)return null;
+ if(card('tiger'))return {type:'card',card:'tiger',tile:best.t.id};
+ if(best.distance&&p.teleports&&p.ap>0)return {type:'teleport',tile:best.t.id};
+ if(best.distance&&card('eagle')&&p.ap>0)return {type:'card',card:'eagle',tile:best.t.id};
+ if(best.distance+1>p.ap&&card('jaguar'))return {type:'card',card:'jaguar'};
+ if(best.distance===0){
+  if(canResearch(p,'warcry')&&!p.warcry)return {type:'research',tech:'warcry'};
+  return {type:'attack'};
+ }
+ return {type:'move',tile:best.path[1]};
+}
+function hardAction(s){
+ const p=active(s),style=hardStyle(p),mine=owned(s,p),canCard=p.played<(has(p,'spiritual')?2:1),card=k=>canCard&&p.cards.includes(k);
+ if(s.phase==='battle')return hardBattleAction(s,s.battle.attacker)||hardBattleAction(s,s.battle.defender)||{type:'resolve'};
+ if(s.phase==='draft'){
+  const occupied=s.players.filter(q=>q.pos!==null),rank=s.tiles.map(t=>{
+   const pathPlayer={...p,pos:t.id};
+   const cheap=s.tiles.reduce((n,g)=>n+(g.biome===0?5/(route(s,pathPlayer,g.id).length||1):0),0);
+   const spacing=occupied.length?Math.min(...occupied.map(q=>route(s,pathPlayer,q.pos).length-1)):4;
+   const nearby=p.leader==='ku'?(spacing===0?-10:12-Math.abs(spacing-2)*5):Math.min(4,spacing)*3;
+   const affordable=buildCost(p,t)<=p.pop+1+(has(p,'spiritual')?5:0);
+   const rich=(p.leader==='tao'||p.leader==='herysi'||p.leader==='asinya')&&affordable?t.biome*10:0;
+   return {t,score:cheap+nearby+rich-buildCost(p,t)*2};
+  }).sort((a,b)=>b.score-a.score);
+  return {type:'place',tile:rank[0].t.id};
+ }
+ if(s.phase!=='playing')return null;
+ const y=income(s,p),enemies=s.tiles.filter(t=>t.owner!==null&&t.owner!==p.id);
+ const threats=enemies.filter(t=>urgentTile(s,t));
+ const pending=mine.some(t=>t.city)||mine.length>=6;
+ const science=p.kn>=30&&p.kn+y.kn*2>=40;
+ const savingForCity=has(p,'city')&&mine.length>0&&!pending&&p.pop<10&&p.pop+y.pop+1>=10;
+ if(card('owl')&&(p.kn>=36||!threats.length))return {type:'card',card:'owl'};
+ if(p.tribute&&mine.length)return {type:'tribute',tiles:[...mine].sort((a,b)=>(b.yield.type==='kn'&&science?4:1)*b.yield.amount-(a.yield.type==='kn'&&science?4:1)*a.yield.amount).slice(0,2).map(t=>t.id)};
+ if(p.ap>0&&!p.rested&&p.kn===39)return {type:'rest'};
+ const interception=interceptClaim(s,p,threats,card);if(interception)return interception;
+ // Extra mobility may turn an otherwise unreachable claim into an attack now.
+ if(threats.length){
+  for(const tech of ['wayfinder','stamina','nomad'])if(canResearch(p,tech)){
+   const probe={...s,players:s.players.map(q=>q.id===p.id?{...q,techs:[...q.techs]}:q)},q=probe.players[p.id];grantTech(probe,q,tech);
+   if(interceptClaim(probe,q,probe.tiles.filter(t=>t.owner!==null&&t.owner!==q.id&&urgentTile(probe,t)),card))return {type:'research',tech};
+  }
+ }
+
+ const targets=s.tiles.map(t=>{
+  const path=route(s,p,t.id),distance=path.length-1;
+  let score=-Infinity,action=null;
+  const revealed=t.revealed?t.yield.amount*(t.yield.type==='pop'?style.pop:style.kn):([1,2,3.5][t.biome])*(style.pop+style.kn)/2;
+  if(t.owner===null&&p.pop>=buildCost(p,t)&&!pending&&!savingForCity){
+   score=27+revealed*2-buildCost(p,t)*.9+(mine.length===5?70:0)+(mine.length<2?10:0);
+   if(science)score-=14;
+   action='build';
+  }
+  if(t.owner===p.id&&!t.city&&has(p,'city')&&p.pop>=10&&!pending){
+   const exposure=s.players.filter(q=>q.id!==p.id).reduce((sum,q)=>sum+(route(s,q,t.id).length<=3?8:0),0);
+   score=100*style.city+t.biome*3-exposure-Math.max(0,4-(p.pop-10))*exposure/4;action='city';
+  }
+  if(t.owner===p.id&&!t.city&&savingForCity){score=60+t.biome*3;action='prepareCity';}
+  if(t.owner!==null&&t.owner!==p.id){
+   const urgent=urgentTile(s,t),estimate=raidEstimate(s,p,t,urgent||mine.length>=5),chance=estimate.chance;
+   score=estimate.value+(mine.length===5?70*chance:0);
+   // A claim we cannot attack this turn must not lure us into futile travel.
+   if(urgent)score=-Infinity;
+   if(t.city&&p.preventedCities.length===1&&!p.preventedCities.includes(t.id))score+=500*chance;
+   if(!urgent&&chance<(p.leader==='ku'?.3:.4))score=-Infinity;
+   if((pending||savingForCity)&&!urgent)score=-Infinity;
+   action='attack';
+  }
+  if(t.owner===p.id&&t.city&&pending){score=60+t.biome;action='guard';}
+  // Travel is priced in AP, with a bonus for completing the objective this turn.
+  score-=distance*7;
+  if(distance+(action==='guard'?0:1)<=p.ap)score+=5;
+  if(distance&&p.visited.includes(t.id))score-=12;
+  return {t,path,distance,score,action};
+ }).sort((a,b)=>b.score-a.score);
+ const best=targets[0];
+ if(card('fox')){
+  const goal=[...style.opening,...style.research].find(id=>!has(p,id));
+  const path=cityResearchPath(p,goal||'city').ids;
+  const options=stealable(s,p).map(o=>({...o,value:TECHS.find(t=>t.id===o.tech).cost+(path.includes(o.tech)?12:0)+(['stamina','wisdom','tent'].includes(o.tech)?5:0)})).sort((a,b)=>b.value-a.value);
+  if(options.length)return {type:'card',card:'fox',player:options[0].player,tech:options[0].tech};
+ }
+ if(card('owl'))return {type:'card',card:'owl'};
+ if(best?.action==='city'&&best.distance===0&&p.ap>0)return {type:'city'};
+ if(!science&&!pending){
+  if(canResearch(p,'growth'))return {type:'research',tech:'growth'};
+  const raiding=best?.action==='attack'&&best.score>20&&best.distance+1<=p.ap;
+  if(raiding){
+   if(best.distance===0&&p.ap>=2&&canResearch(p,'warcry')&&!p.warcry)return {type:'research',tech:'warcry'};
+   const upgrade=['hunter','spoils','ferocity','archery','wartribe'].find(id=>canResearch(p,id));
+   if(upgrade)return {type:'research',tech:upgrade};
+  }
+  if(canResearch(p,'city')&&mine.length&&(p.leader==='asinya'||p.turns>=6)&&p.pop>=10)return {type:'research',tech:'city'};
+  const next=leaderResearch(p);
+  if(next&&canResearch(p,next))return {type:'research',tech:next};
+  if(!next&&canResearch(p,'city')&&mine.length)return {type:'research',tech:'city'};
+ }
+ if(pending){
+  if(best?.action==='guard'&&best.distance>0&&p.ap>0)return {type:'move',tile:best.path[1]};
+  if(p.ap>0&&!p.rested)return {type:'rest'};
+  // Spend surplus population on a defensive card while holding a claim.
+  if(!p.cards.includes('turtle')&&p.pop>=15&&p.cards.length<4&&(s.deck.length||s.discard.length))return {type:'buyCard'};
+  return {type:'end'};
+ }
+ if(best?.score>0&&best.action!=='guard'){
+  if(best.action==='attack'&&card('tiger')&&(best.distance>0||p.ap===0))return {type:'card',card:'tiger',tile:best.t.id};
+  const decisive=best.action==='city'||mine.length===5;
+  if(best.distance>1&&p.ap>0&&p.teleports&&(decisive||p.leader!=='hecatl'&&best.action==='attack'))return {type:'teleport',tile:best.t.id};
+  if(best.distance>1&&p.ap>0&&card('eagle')&&(decisive||best.action==='attack'))return {type:'card',card:'eagle',tile:best.t.id};
+  if(p.ap>0){
+   if(best.distance===0&&best.action!=='prepareCity')return {type:best.action};
+   if(best.path[1]!==undefined&&!p.visited.includes(best.path[1]))return {type:'move',tile:best.path[1]};
+  }
+  if(card('jaguar')&&best.action!=='prepareCity')return {type:'card',card:'jaguar'};
+ }
+ if(p.ap>0&&!p.rested)return {type:'rest'};
+ const cardReserve=['tao','daikotei'].includes(p.leader)?8:15;
+ if(p.pop>=cardReserve+5&&p.cards.length<2&&(s.deck.length||s.discard.length))return {type:'buyCard'};
+ return {type:'end'};
+}
 export function aiBattleAction(s,id){
+ if(s.difficulty==='hard')return hardBattleAction(s,id);
  const b=s.battle,p=s.players[id],defending=id===b.defender;
  if(b.ready[id])return null;
  if(defending&&p.cards.includes('turtle'))return {type:'battleReady',player:id,turtle:true};
@@ -222,6 +419,7 @@ export function aiBattleAction(s,id){
  return {type:'battleReady',player:id};
 }
 export function aiAction(s){
+ if(s.difficulty==='hard')return hardAction(s);
  const p=active(s),l=leader(p);
  if(s.phase==='draft'){
   const occupied=s.players.filter(q=>q.pos!==null).map(q=>s.tiles[q.pos]);const options=s.tiles.filter(t=>t.biome===0).map(t=>({t,v:occupied.length?Math.min(...occupied.map(o=>(o.x-t.x)**2+(o.y-t.y)**2)):random(s)*100})).sort((a,b)=>b.v-a.v);return {type:'place',tile:options[0].t.id};
