@@ -1,11 +1,13 @@
 # Tribes of the Lost Island — Living Rules
 
-**Document version:** 2.1  
+**Document version:** 2.3  
 **Baseline date:** October 8, 2026 (America/Chicago)  
 **Implemented ruleset ID:** `tribes-rules-2`  
-**Scope:** The current playable browser game, including its computer opponents.
+**Scope:** The current playable browser game, including its computer opponents and private-room multiplayer.
 
-**Latest update:** October 9, 2026: Hard bots now have leader-specific priorities informed by Brett's six playtests, value profitable raids, and prioritize reachable claim interceptions. Bot policy: `leader-playstyles-2026-10-09`. The underlying rules remain edition 2, using `Kn Tree - Current (5).png` and Brett's explicit dice clarification: base D6 + D4; Archery and Shields give 2D6.
+**Multiplayer availability:** Private rooms use the same edition-2.3 gameplay rules, leader starts, and four victories. The server controls actions and saves; each player sees only their own spirit hand. Complete multiplayer audit exports unlock after victory to avoid revealing hidden information during play. See `MULTIPLAYER.md` for room setup, reconnection, storage, and local testing. Single-player saves and in-progress audit exports retain their existing behavior.
+
+**Latest update:** October 12, 2026: applied the approved leader roster. Ku has no opening AP bonus; Asinya starts with 18 population; Tao starts with 3 knowledge; Daikotei starts with two spirit cards and purchases additional cards for 3 population. Herysi and Hecatl keep their original starts. Science victory remains immediate at 40 knowledge. Revision: `2.3-leaders-2026-10-12`. Cunning Fox continues to copy technologies without removing them from the source.
 
 This is our working reference for auditing and changing the video game. It describes the implementation as it exists, including assumptions and known differences from the supplied board-game materials. Documenting a behavior does not mean you have approved it as a final design decision.
 
@@ -39,7 +41,7 @@ Source materials: `Copy of Tribes Official Rules 2.0.pdf`, `Tribes board 12_24_2
 | REST-02 | Rest while owning Nomad | Same 1 AP cost and once-per-turn limit |
 | CITY-01 | Upgrade your settlement to a city | City technology + 1 AP + 10 population |
 | CITY-02 | Maximum cities per tribe | 2 at a time |
-| SPIRIT-01 | Buy a random spirit card | 5 population; 0 AP |
+| SPIRIT-01 | Buy a random spirit card | 3 population for Daikotei; 5 for other leaders; 0 AP |
 | SPIRIT-02 | Normal spirit-play allowance | 1 card per own turn; Spiritual raises it to 2 |
 | RESEARCH-01 | Buy a technology | Listed knowledge cost; 0 AP |
 | WIN-01 | Settler victory | Hold at least 6 settlements continuously until your next turn |
@@ -78,24 +80,24 @@ Biome identity is public, marked B / M / C on the board. A tile’s single resou
 
 ## 4. All six leaders
 
-Population and knowledge use Brett’s updated starting values; other leader benefits come from the supplied leader cards. The personality column describes the current computer strategy. The interface's descriptive leader titles are presentation text and grant no additional powers.
+Starting stats and benefits follow Brett’s approved October 12 roster. The personality column describes the current computer strategy. The interface's descriptive leader titles are presentation text and grant no additional powers.
 
 | Leader | Starting population | Starting knowledge | Starting technology | Other starting benefit | Computer personality |
 | --- | --- | --- | --- | --- | --- |
-| Ku Nuele | 10 | 5 | Hunter | +2 AP on the first own turn only | Conqueror |
-| Asinya | 16 | 5 | None | Larger population balance is the whole starting benefit | Builder |
+| Ku Nuele | 10 | 5 | Hunter | +1 attack from Hunter; no opening AP bonus | Conqueror |
+| Asinya | 18 | 5 | None | Larger population balance is the whole starting benefit | Builder |
 | Herysi | 10 | 5 | Gatherer | No additional benefit beyond Gatherer | Builder |
 | Hecatl | 10 | 5 | Nomad | No additional benefit beyond Nomad | Explorer |
-| Tao Zhe | 10 | 5 | Spiritual | No additional benefit beyond Spiritual | Scholar |
-| Daikotei | 10 | 5 | None | Two random spirit cards at setup | Conqueror |
+| Tao Zhe | 10 | 3 | Spiritual | No additional benefit beyond Spiritual | Scholar |
+| Daikotei | 10 | 5 | None | Two random spirit cards at setup; additional cards cost 3 population | Conqueror |
 
-Starting technologies are free; they do not deduct their normal research costs. Thus Ku Nuele normally starts the first playable turn with 11 population, 6 knowledge, Hunter, and 4 AP.
+Starting technologies are free; they do not deduct their normal research costs. Ku normally starts the first playable turn with 11 population, 6 knowledge, Hunter, and 2 AP. Asinya has 19 population and 6 knowledge after first-turn income; Tao has 11 population and 4 knowledge. Hecatl starts with only Nomad, without Stamina.
 
 ## 5. Turn sequence and action points
 
 **TURN-01 — Start of turn.** In order: check whether this tribe has completed a held victory condition; if so, end the game immediately. Otherwise, reset its AP allowance, rest allowance, attack count, normal spirit-play count and temporary War Cry bonus, then collect its current income.
 
-**TURN-02 — AP calculation.** The allowance is 2, plus 1 if the tribe owns Stamina, plus 2 if it is Ku Nuele's first own turn. Buying or stealing Stamina grants one AP immediately. Swift Jaguar grants two additional AP immediately. Unspent AP does not carry into the next own turn: the allowance is reset, not added to the old balance.
+**TURN-02 — AP calculation.** The allowance is 2, plus 1 if the tribe owns Stamina. No leader has a bonus first-turn allowance. Buying Stamina or learning it with Cunning Fox grants one AP immediately to the learner. Swift Jaguar grants two additional AP immediately. Unspent AP does not carry into the next own turn: the allowance is reset, not added to the old balance.
 
 **TURN-03 — Action order.** After receiving income, the active tribe may move, build, attack, upgrade, rest, research, draw cards, play permitted cards, and use unlocked once-only abilities in any affordable order. It may repeat ordinary actions except rest, which is limited to once per own turn. A battle must finish before another action is taken.
 
@@ -202,9 +204,9 @@ Bonuses stack. For example, Hunter + Ferocity + War Tribe gives +5 attack. City 
 
 **RESEARCH-01 — Purchase. Source.** During your own turn, pay the listed knowledge cost and 0 AP. You must not already own that technology. A root technology needs no prerequisite. For a technology with several listed parents, owning any one is sufficient; you do not need all of them. Multiple tribes may independently own the same technology.
 
-**RESEARCH-02 — Timing and retention.** Abilities apply immediately unless they explicitly describe recurring income. Buying Wisdom or Fertility increases the rate but does not grant an immediate payout. Losing a prerequisite later does not remove already-owned descendant technologies. A stolen technology can be purchased again if its current prerequisites and cost are met.
+**RESEARCH-02 — Timing and retention.** Abilities apply immediately unless they explicitly describe recurring income. Learning Wisdom or Fertility increases the rate but does not grant an immediate payout. Technologies remain owned; Cunning Fox does not remove them from another tribe.
 
-**RESEARCH-03 — One-time effects.** A one-time purchase effect happens once for that purchase. Wayfinder and Tribute provide an unused ability that can be saved for a later own turn. There is no ordinary repurchase while you still own the technology. If it is stolen and you buy it again, the engine applies its purchase effect again. Stealing one-time technologies behaves differently; see SPIRIT-07.
+**RESEARCH-03 — One-time effects.** A one-time learning effect happens once when the tribe first obtains that technology, whether through research or Cunning Fox. Wayfinder and Tribute provide an unused ability that can be saved for a later own turn. Already-owned technologies cannot be purchased or copied again.
 
 | ID | Technology | Knowledge cost | Any one prerequisite | Exact effect |
 | --- | --- | --- | --- | --- |
@@ -237,9 +239,9 @@ Costs and prerequisites follow `Kn Tree - Current (5).png`; Archery and Shields 
 
 **RESEARCH-05 — Empty deck rewards. Review item.** If the spirit deck is empty, discards are reshuffled. If every card is in a player's hand and no discards exist, an automatic draw from Spirit Offering or Spirit Favor gives no card. Spirit Offering is still purchased and paid for in this edge case; there is no waiting entitlement or refund.
 
-## 11. Spirit cards and technology theft
+## 11. Spirit cards and technology learning
 
-**SPIRIT-01 — Buy and hold. Source.** Spend 5 population and 0 AP to draw a random card during your own turn. Buy as many as you can afford. There is no hand-size cap. A newly drawn card can be played immediately if the relevant allowance and targeting rules permit it.
+**SPIRIT-01 — Buy and hold. Confirmed leader discount; source purchase procedure.** Spend 3 population as Daikotei, or 5 population as any other leader, and 0 AP to draw a random card during your own turn. Buy as many as you can afford. There is no hand-size cap. A newly drawn card can be played immediately if the relevant allowance and targeting rules permit it.
 
 **SPIRIT-02 — Play allowance. Source.** Normally play at most one non-Turtle card per own turn. Owning Spiritual raises the limit to two. The limit is checked against currently owned technologies each time you play. Both copies of the same card may be played if you have them and have allowance. Cards cost 0 AP and no additional population to play.
 
@@ -247,7 +249,7 @@ Costs and prerequisites follow `Kn Tree - Current (5).png`; Archery and Shields 
 
 | Card | Copies | Effect | Timing and targets |
 | --- | --- | --- | --- |
-| Cunning Fox | 6 | Steal one eligible technology from another tribe | Own turn; you must meet its prerequisite and not already own it |
+| Cunning Fox | 6 | Learn one eligible technology from another tribe for free; they keep it | Own turn; you must meet its prerequisite and not already own it |
 | Swift Jaguar | 6 | Gain 2 AP immediately | Own turn, including when at zero AP |
 | Guardian Turtle | 6 | Automatically win one defensive battle | Before dice; outside normal spirit-play allowance |
 | Soaring Eagle | 6 | Teleport your leader to any tile | Own turn; no extra cost |
@@ -256,20 +258,23 @@ Costs and prerequisites follow `Kn Tree - Current (5).png`; Archery and Shields 
 
 **SPIRIT-04 — Fighting Tiger interactions.** The target may be a city or a settlement your leader already occupies. The attack uses your normal dice, bonuses and public population commitments, with no exhaustion; it counts as an initiated attack. It can be stopped by Guardian Turtle. Victory, capture and technology rewards work normally. You cannot target your own settlement or an unbuilt tile.
 
-**SPIRIT-05 — Invalid plays.** A card lacking a legal target cannot be played and is not spent. Cunning Fox cannot take a technology you already own or one whose prerequisites you do not meet. A root technology can be stolen without a prerequisite. There is no need to stand near the rival.
+**SPIRIT-05 — Invalid plays.** A card lacking a legal target cannot be played and is not spent. Cunning Fox cannot copy a technology you already own or one whose prerequisites you do not meet. A root technology can be learned without a prerequisite. There is no need to stand near the rival.
 
 **SPIRIT-06 — Information.** Each human sees their own card hand; computer hands are not displayed. Public resources, settlement ownership and revealed yields are visible. Audit exports deliberately include every hand, deck and hidden yield for verification; opening an audit during a match can reveal information the normal game screen hides.
 
-**SPIRIT-07 — Exact theft behavior. Provisional edge-case policy.** Remove the technology from the victim and give it to the thief. Its ongoing bonuses stop for the victim and become available to the thief. The victim keeps already-owned descendants and already-built cities. In addition:
+**SPIRIT-07 — Cunning Fox learning. Confirmed correction, October 11, 2026.** Learn one eligible technology another tribe owns, at no knowledge or action-point cost. The source tribe keeps its technology and all its resources, current effects and unused abilities. The card still consumes one spirit-card play. The learner receives the technology's normal effects:
 
-- Stamina: subtract 1 from the victim's stored AP, with a floor of zero, and give the thief +1 AP immediately. Future allowances use current ownership.
-- Wayfinder: erase the victim's unused teleport; give the thief the technology but no teleport charge.
-- Tribute: erase the victim's unused collection; give the thief the technology but no collection charge.
-- War Cry: clear the victim's temporary bonus; give the thief no immediate +3 bonus.
-- New Followers and Spirit Offering: do not replay their population/card reward for the thief; prior rewards are not taken back from the victim.
-- Wisdom and Fertility: change future income rates; do not refund or claw back previously collected resources.
-- City: transfers permission to upgrade. Existing cities remain owned by the victim and may still produce a City victory.
-- Research eligibility depends on the technologies currently owned, but losing a prerequisite does not cascade through descendants.
+- Stamina: +1 AP immediately and +1 on future turns. The source tribe loses no AP.
+- Wayfinder: one unused teleport for the learner; the source tribe keeps any unused teleport.
+- Tribute: one collection ability for the learner; the source tribe keeps theirs.
+- War Cry: +3 attack for the learner's current turn; the source tribe's temporary bonus is unchanged.
+- New Followers and Spirit Offering: grant the learner +5 population or one card, respectively, once.
+- Wisdom and Fertility: increase future income rates without an immediate payout.
+- Archery and Shields: both tribes retain their upgraded dice.
+- City: both tribes may upgrade their own settlements; existing cities are unchanged.
+- Already-owned technologies cannot be copied again to repeat a one-time reward.
+
+The Fox correction began in revision `2.2-fox-copy-2026-10-11`. New games and successful action events now record `2.3-leaders-2026-10-12`. Resumed games use this behavior for future actions, without rewriting historical events or restoring technologies previously removed. Start a new game for clean tests under the corrected rule.
 
 ## 12. Victory and game end
 
@@ -307,7 +312,7 @@ These are digital strategy settings, not restrictions on human play. All persona
 
 **AI-01 — Setup.** Choose a beach as far as possible, by squared straight-line distance, from the nearest already-placed leader. If nobody has arrived, rank beaches randomly. This is a placement heuristic, not a path-distance calculation.
 
-**AI-02 — Personalities and research order.** Consider the first technology in the relevant list that is not currently owned. Purchase it only if affordable, eligible and current knowledge is below 30; at 30 or more, stop research to save toward Science. A technology stolen from that sequence becomes a priority again. The current lists are fixed:
+**AI-02 — Personalities and research order.** Consider the first technology in the relevant list that is not currently owned. Purchase it only if affordable, eligible and current knowledge is below 30; at 30 or more, stop research to save toward Science. The current lists are fixed:
 
 | Personality | Leaders | Research priorities, in order |
 | --- | --- | --- |
@@ -322,11 +327,11 @@ These are digital strategy settings, not restrictions on human play. All persona
 
 1. In combat, use the public commitment policy below; confirm Guardian Turtle when defending with one in hand.
 2. If normal card allowance remains, use Fighting Tiger against the first rival city or settlement belonging to a rival with a pending Settler claim.
-3. If allowed and held, play Wise Owl; then, on a later decision, Swift Jaguar if at zero AP; then Cunning Fox against the eligible rival technology with the highest listed knowledge cost.
+3. If allowed and held, play Wise Owl; then, on a later decision, Swift Jaguar if at zero AP; then Cunning Fox to learn the eligible rival technology with the highest listed knowledge cost.
 4. Use an unused Tribute ability on up to two owned settlements with the highest numeric tile yield. The two resource types are compared by their raw yield number.
 5. If standing on its own ordinary settlement with City and 10 population and AP, try upgrading.
 6. Try the next priority research using the difficulty rule above.
-7. At zero AP, buy a spirit card if population is greater than 14, the hand has fewer than 3 cards, and the draw deck itself has cards. Otherwise end the turn. The current AI does not buy from an empty draw deck even when reshuffling discards would be legal.
+7. At zero AP, buy a spirit card if population covers its leader-specific price plus a 10-population reserve (13 population for Daikotei; 15 for other leaders), the hand has fewer than 3 cards, and the draw deck itself has cards. Otherwise end the turn. The current AI does not buy from an empty draw deck even when reshuffling discards would be legal.
 8. Attack a rival settlement at the current location if affordable and fewer than two attacks have been initiated this turn, or if that location is an imminent victory threat.
 9. Build at the current location if it is empty and affordable.
 10. Score travel destinations as described below. Use a stored Wayfinder teleport first, or Soaring Eagle second, if the best destination is at least two edges away. Otherwise move along the first step of a shortest available route if that next step has not been visited this turn.
@@ -349,6 +354,8 @@ The AI uses these heuristics, not a full strategic search or an external AI serv
 
 **AI-07 — Hard difficulty (added October 8, 2026).** Hard changes computer decisions only. It has the same starting resources, income, AP, dice, costs and victory conditions as the player. It uses public positions, technology, resource balances, commitments and revealed yields plus its own hand. It cannot inspect rival hands, hidden tile yields or future random rolls. Select Hard when starting a new game; resuming a saved match keeps that match's difficulty. Audits export the selected difficulty.
 
+Hard purchases use the actual spirit-card price. Ordinary purchasing preserves 8 population for Tao and Daikotei or 15 for other leaders; purchasing while protecting a victory claim preserves 10 population. These reserves are unchanged by Daikotei’s discount.
+
 Hard evaluates routes after every action. Starting positions consider affordability, nearby cheap spaces and leader preferences. Ku favors proximity for early raids; economic leaders put more value on affordable richer biomes. Unrevealed yields use biome averages, never their actual hidden values. Capture value includes income gained and denied, Spoils and Spirit Favor rewards, and progress toward six settlements. Bots consider combat improvements before an immediately reachable raid. At 30 or more knowledge, if two turns of current income can reach 40, they stop buying research to preserve a Science victory. They immediately use Owl at 36 knowledge or rest at 39 when legal.
 
 **AI-08 — Leader playstyles (October 9, 2026).** The six supplied human audits inform preferences rather than fixed move sequences. Every leader adapts to the public position and can take a favorable attack or alternative victory.
@@ -362,7 +369,7 @@ Hard evaluates routes after every action. Starting positions consider affordabil
 | Tao Zhe | New Followers and Wisdom, valuable population income, then Hunter/Spoils/Favor and stronger combat; use both spirit plays and buy cards with surplus population. |
 | Daikotei | Use starting spirits, acquire mobility and discounted building, then Hunter/Spoils/Ferocity for selective raids; support later attacks with defensive research and cards. |
 
-Hard prioritizes interceptions that can actually produce an attack this turn, using Tiger, Wayfinder, Eagle or Jaguar when available. A reachable defended settlement can take priority over an unreachable weak one. When several players have pending victories, earlier winning turns take priority. Bots may research mobility when it makes an interception possible now. They steal technologies based on their cost and contribution to the leader's plan. City placement considers nearby rivals and remaining defensive population. When holding a city, a bot tries to station its leader there, rests, and may buy cards from surplus population for a Turtle defense. These are strategic estimates, not a guarantee that every rival claim can be stopped.
+Hard prioritizes interceptions that can actually produce an attack this turn, using Tiger, Wayfinder, Eagle or Jaguar when available. A reachable defended settlement can take priority over an unreachable weak one. When several players have pending victories, earlier winning turns take priority. Bots may research mobility when it makes an interception possible now. They copy technologies based on their cost and contribution to the leader's plan. City placement considers nearby rivals and remaining defensive population. When holding a city, a bot tries to station its leader there, rests, and may buy cards from surplus population for a Turtle defense. These are strategic estimates, not a guarantee that every rival claim can be stopped.
 
 Hard combat enumerates all possible dice totals, including defense winning ties. For an ordinary battle it reserves half its population income, rounded down and limited to 4–10 population (2–10 for Ku); for a city, pending Settler claim, or attack by a tribe already holding at least five settlements, it can commit all its population. It chooses the affordable even bid maximizing estimated win probability times the value of the location, minus population spent. Bids only increase, so automatic counteroffers terminate. A defending bot with Turtle confirms it. The policy uses the current public offer, and does not predict or read the next dice roll.
 
@@ -392,10 +399,10 @@ These are recorded for review; none of the alternatives below has been applied.
 | REVIEW-04 | Spirit deck | Six copies of each of six types; confirm quantities and discard recycling. |
 | REVIEW-05 | Nomad rest — resolved | All players use the same 1 AP, once-per-turn rest; it does not end the turn. |
 | REVIEW-06 | Arrival order | All tribes sorted by D6 result, with player-ID tie resolution; decide whether to use the PDF's clockwise sequence and rerolls. |
-| REVIEW-07 | Technology theft | Confirm retained descendants/cities, Stamina's immediate AP transfer, erased unused abilities, and repurchase effects. |
+| REVIEW-07 | Cunning Fox | Resolved October 11: free learning with source ownership and benefits preserved; see SPIRIT-07. |
 | REVIEW-08 | Tribute selection | Engine permits one or two, but interface requires two when available. Decide the desired behavior and align them. |
 | REVIEW-09 | Empty card rewards | Automatic draws silently award nothing when all cards are held; decide whether to block, defer or compensate. |
-| REVIEW-10 | War Cry | Current tree confirms +3 attack on the purchase turn. Technology stays owned; theft/repurchase behavior remains as documented. |
+| REVIEW-10 | War Cry | Current tree confirms +3 attack on the purchase turn. Technology stays owned; copying grants its normal current-turn effect once to the new learner. |
 | REVIEW-11 | AI choices | Fixed research and travel heuristics, unconditional Turtle use, no discard-only purchase, and teleport visited-list differences are candidates for tuning. |
 | REVIEW-12 | Limits and game end | No round cap, resource cap, player elimination or draw; decide whether any are wanted. |
 
@@ -405,8 +412,8 @@ These are recorded for review; none of the alternatives below has been applied.
 2. Identify related effects: AI behavior, leader advantages, card combinations, income timing, victory pacing and interface wording.
 3. Record the accepted change below with old value, new value, date and reason. Leave unaccepted ideas in section 16.
 4. Update the implementation and targeted tests, then check that the document and the playable game agree.
-5. Issue a new document version and a new audit ruleset ID for gameplay changes. Preserve the previous version in the rules history. Historical downloaded reports remain unchanged.
-6. For balance changes, start a new playtest game. This release rejects old-rule saves for gameplay, retaining their audit export. Future revisions must similarly preserve ruleset identity or provide an explicit migration.
+5. Issue a new document version and audit rules revision for gameplay changes; change the ruleset ID when save compatibility changes. Preserve the previous version in the rules history. Historical downloaded reports remain unchanged.
+6. For balance changes, start a new playtest game. Edition-1 saves remain export-only. Compatible edition-2 saves may resume: existing resources, technologies, hands and audit history are preserved; future actions use the current revision, including card prices and turn allowances. New starting balances apply only to new matches.
 
 Useful change-request format: **Rule ID / proposed value or behavior / reason / what to watch in playtesting**. You can also describe changes in ordinary language; the IDs give us a precise place to record them.
 
@@ -421,6 +428,10 @@ Useful change-request format: **Rule ID / proposed value or behavior / reason / 
 
 | 2.0 | October 8, 2026 | tribes-rules-2 | Applied the latest tree, withdrawn Armor, explicit 2D6 upgrades, pooled biomes, new starts, public combat spending, no exhaustion, common rest, Science and Kingmaker. Updated interface, AI, audits and save compatibility. | Yes |
 | 2.1 | October 9, 2026 | tribes-rules-2 | Added six Hard leader playstyles based on Brett's audits, more valuable raids, reachable claim interceptions, and policy labels on computer audit events. | AI decisions only; rules and costs unchanged |
+
+| 2.2 | October 11, 2026 | tribes-rules-2 / 2.2-fox-copy-2026-10-11 | Corrected Cunning Fox to free technology copying, retaining all source benefits and granting normal learning effects. Added revision labels to audits. Prior tournament results include the former removal rule. | Yes |
+
+| 2.3 | October 12, 2026 | tribes-rules-2 / 2.3-leaders-2026-10-12 | Applied the approved leader roster: Ku opening AP bonus removed; Asinya 18 population; Tao 3 knowledge; Daikotei two starting cards and 3-population purchases. Herysi and Hecatl unchanged. Science remains enabled at 40 knowledge. Updated interface, purchase affordability, audits and tests. | Yes |
 
 ### Implementation index
 
@@ -444,7 +455,7 @@ The living source is `RULES.md`. The browser reading copy is generated from it; 
 - Brett’s dice clarification overrides the image: base D6 + D4; Archery/Shields 2D6.
 - Rallying Cry remains 2 knowledge and awards 3 population per defensive victory; normal defense awards none.
 - Attacks cost 1 AP and no population entry fee. Optional population spending is public and adjustable. No attacker exhaustion.
-- Starting population is 10, or 16 for Asinya; knowledge is 5. All 24 selected tiles are randomized across locations.
+- Starting population is 10, or 18 for Asinya; knowledge is 5, or 3 for Tao. Ku has no opening AP bonus. Daikotei starts with two cards and purchases additional cards for 3 population; others pay 5. Hecatl starts with Nomad only. All 24 selected tiles are randomized across locations.
 - Rest is once per own turn for every leader and does not end the turn. Stamina stays 2 knowledge.
 - City research costs 10 knowledge; conversion costs 10 population and retains its existing 1 AP cost. City adds +1 defense on top of biome defense.
 - Settlement and City must survive until the next own turn. Science is 40 unspent knowledge and immediate. Kingmaker is two different city locations captured during their holding periods and immediate.

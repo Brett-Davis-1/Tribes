@@ -1,12 +1,18 @@
 # Tribes of the Lost Island
 
-A local single-player strategy prototype using Brett's original board and card artwork. Choose any of six leaders and play against one to three computer tribes.
+A local strategy game using Brett's original board and card artwork. Play single-player against bots, or create a private multiplayer room for 2–4 seats with optional hard bots.
+
+## Private multiplayer
+
+Open **http://127.0.0.1:4178/?multiplayer=1** after starting the server. Create a room, share its invite with another browser or private window on this computer, choose distinct leaders, mark everyone ready, and start. The host can add hard bots. See **MULTIPLAYER.md** for the complete testing, reconnect, storage and hosting instructions.
+
+Multiplayer requires Node 22.14+ and stores matches/audits in `data/tribes.sqlite`. Seat credentials stay in each player's browser. All four victories remain enabled. Full multiplayer audit exports unlock after victory to protect hidden hands and tile yields. The localhost link is only for this computer; remote friends will need a hosted deployment.
 
 ## Play
 
 The complete editable rulebook is **RULES.md**. Read **rules-reference.html** in a browser for a formatted copy with contents navigation. Rule IDs, provisional assumptions, review items and a version log make it the reference for future changes. Regenerate the reading copy with `npm run docs` after editing the Markdown source.
 
-Run `node server.mjs` in this directory, then open http://127.0.0.1:4178 in a browser. Node.js is the only runtime requirement; no package installation, API key, paid service, or internet connection is required.
+Run `node server.mjs` in this directory, then open http://127.0.0.1:4178 in a browser. Node.js 22.14+ is the only runtime requirement; no package installation, API key, paid service, or internet connection is required for local play.
 
 Choose a leader and rival count. The tribes roll for arrival order; select a location and click **Land here** when it is your turn. Select locations to inspect them, then use the right-hand action buttons. Research and spirit cards remain available even after all actions are spent. Your match saves automatically in this browser.
 
@@ -18,7 +24,7 @@ The game can be restarted using `Start Tribes.cmd` on Windows. Leave the server 
 - Original 24-location island, with 24 of 30 biome tiles shuffled across all locations.
 - Movement, building, resting, attacking, settlement income, public population commitments, biome defense, city upgrades, held Settlement/City victories and immediate Science/Kingmaker victories.
 - The supplied Kn Tree - Current (5).png knowledge tree, with confirmed 2D6 Archery/Shields upgrades, including free actions, teleportation, immediate yields, defensive/offensive upgrades and one-time rewards.
-- Six spirit card types, including targeted technology theft and Guardian Turtle's defensive response window.
+- Six spirit card types, including free technology learning from rivals and Guardian Turtle's defensive response window.
 - Three difficulty settings (Relaxed, Standard, Hard), fast turns, a chronicle, and local save/resume. Hard uses victory planning, public combat odds, resource reserves and claim interception without resource or dice bonuses.
 - Responsive interface, reduced-motion support and animated leader movement.
 
@@ -30,7 +36,7 @@ The user confirmed random selection of 24 from 30 tiles and requested omission o
 - Base combat is D6 + D4. Archery upgrades attack to 2D6; Shields upgrades defense to 2D6. These values are confirmed.
 - Nomad permits travel along dashed coastal routes, at one action per neighboring beach. Boat numbers are not applied. Standard trails were traced from the supplied board and should be confirmed in playtesting.
 - The 36-card spirit deck has six of each type and reshuffles its discards when empty.
-- Theft removes passive benefits and unused once-only privileges, keeps already-unlocked descendants and existing cities, and never replays immediate rewards for the thief.
+- Cunning Fox copies an eligible rival technology for free. The rival keeps the technology and all benefits; the learner receives its normal effects, including one-time rewards. Prerequisites still apply and already-owned technologies cannot be copied.
 - Stamina gives its extra action immediately. Every player rests once per own turn for 1 AP; Nomad uses that same rule.
 - The newest knowledge tree supersedes older illustrated values. Technologies with no supplied name have short descriptive names in the interface.
 - Computer tribes use public state and expected environment values, never hidden tile yields or a human's unrevealed cards. Relaxed mode reduces research consistency without changing costs or dice.
@@ -57,7 +63,7 @@ Hard was updated October 9 with six leader playstyles based on Brett's own games
 
 Run `node hard-bot-audit.mjs --games=200` for a larger self-play audit: 200 setups at each of 2, 3 and 4 players, each replayed with all-current and all-previous Hard bots (1,200 matches). Timestamped results go into `bot-audits/`, including a Markdown report, per-game and per-player JSON summaries, and a compressed full action/resource audit for each current-bot game. The report separates lobby sizes, records attacks per player turn and claim interruptions, and compares leader wins with their expected share of wins given lobby size. These simulations do not touch browser saves or change game rules. `--seed-offset=2001` controls the reproducible seed series.
 
-Run `node --test tests.mjs` (or `npm test`). The suite covers tile selection, map connectivity, illegal actions, income timing, combat ties, city capture, defensive spirit timing, public population commitments, rest limits, all four victories, the entire supplied technology table, dice upgrades, save compatibility, theft, hidden-information isolation, and 18 complete seeded simulations across all leaders.
+Run `node --test tests.mjs` (or `npm test`). The suite covers tile selection, map connectivity, illegal actions, income timing, combat ties, city capture, defensive spirit timing, public population commitments, rest limits, all four victories, the entire supplied technology table, dice upgrades, save compatibility, free technology copying, hidden-information isolation, and 18 complete seeded simulations across all leaders.
 
 ## Files
 
@@ -68,6 +74,15 @@ Run `node --test tests.mjs` (or `npm test`). The suite covers tile selection, ma
 - `source-assets/`: the supplied ZIP's source artwork, preserved for reference.
 - `DESIGN.md`: initial source review and adaptation brief.
 
-This is rules edition 2 of the playable skirmish, ready for rule confirmation and balance feedback. Campaigns, island events, online multiplayer and native installers are not implemented.
+This is rules edition 2.3 of the playable skirmish, ready for rule confirmation and balance feedback. Private-room multiplayer is implemented locally; public hosting, campaigns, island events, and native installers are not included.
 
 For isolated browser UI checks, open `ui-test.html`. Its scenarios use a separate local-storage key and skip audit-history persistence. Normal matches and their reports are unaffected.
+
+Cunning Fox was corrected October 11, 2026 (rules revision `2.2-fox-copy-2026-10-11`). Earlier games and bot tournaments used technology removal and should be treated as pre-correction results. New audits and successful action events identify the revision. Resumed games apply the correction to future actions; earlier losses of technology are not reversed. Start a fresh match for clean balance testing.
+
+
+## October 12 leader update
+
+Rules revision `2.3-leaders-2026-10-12` applies the approved roster: Ku has Hunter with no opening AP bonus; Asinya starts with 18 population; Tao starts with 3 knowledge; Daikotei starts with two spirit cards and buys additional cards for 3 population. Herysi retains Gatherer and Hecatl retains only Nomad. Science victory remains immediate at 40 knowledge. All other leaders start with 10 population and 5 knowledge.
+
+Refresh the game and begin a new match to use the new starting stats. Resuming an edition-2 save preserves its existing resources, technologies, cards and audit history; future actions use the new card prices and turn allowances. Earlier version-1 saves remain export-only. Earlier balance-study scripts target their original baselines and intentionally reject incompatible source revisions; their frozen engines, full logs and results remain in `leader-balance-tests/`. The archived pre-update engine is in `rules-history/engine-v2.2-leaders/`.

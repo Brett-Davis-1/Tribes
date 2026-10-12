@@ -1,0 +1,1 @@
+{"name":"tribes-of-the-lost-island","private":true,"type":"module","engines":{"node":">=22.14.0"},"scripts":{"start":"node server.mjs","test":"node --test tests.mjs multiplayer-tests.mjs","docs":"node build-rules.mjs"}}

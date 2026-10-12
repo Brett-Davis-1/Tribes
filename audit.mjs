@@ -2,7 +2,7 @@
 export const AUDIT_VERSION=1;
 const copy=value=>structuredClone(value);
 export function snapshot(s,income){
- return {phase:s.phase,round:s.round,turn:s.turn,activePlayer:s.order[s.turnIndex],rngState:s.seed,
+ return {rulesRevision:s.rulesRevision??null,phase:s.phase,round:s.round,turn:s.turn,activePlayer:s.order[s.turnIndex],rngState:s.seed,
   players:s.players.map(p=>({...copy(p),income:income(s,p),settlements:s.tiles.filter(t=>t.owner===p.id).map(t=>t.id),cities:s.tiles.filter(t=>t.owner===p.id&&t.city).map(t=>t.id)})),
   tiles:copy(s.tiles),deck:copy(s.deck),discard:copy(s.discard),battle:copy(s.battle),winner:s.winner??null,victory:s.victory??null};
 }
@@ -25,7 +25,7 @@ export function recordAudit(s,{type,actor,before,after,description,details={},ac
 }
 export function exportAudit(s,finalState){
  if(!s.audit)throw new Error('Detailed recording has not started for this match.');
- return {...copy(s.audit),exportedAt:new Date().toISOString(),status:s.phase==='won'?'completed':'in_progress',difficulty:s.difficulty,turnOrder:copy(s.order),winner:s.winner??null,victory:s.victory??null,finalState:copy(finalState)};
+ return {...copy(s.audit),exportedAt:new Date().toISOString(),status:s.phase==='won'?'completed':'in_progress',difficulty:s.difficulty,rulesRevision:s.rulesRevision??null,turnOrder:copy(s.order),winner:s.winner??null,victory:s.victory??null,finalState:copy(finalState)};
 }
 const html=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const names=(report,id)=>report.catalog.leaders.find(p=>p.id===report.initialState.players.find(p=>p.id===id)?.leader)?.name??'System';

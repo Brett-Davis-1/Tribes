@@ -1,0 +1,29 @@
+import {readFile,writeFile} from 'node:fs/promises';
+
+// Small offline renderer for this rulebook's headings, tables, lists and paragraphs.
+// RULES.md remains the editable source; no network or package installation is needed.
+const source=await readFile(new URL('RULES.md',import.meta.url),'utf8');
+const escape=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const version=escape(source.match(/\*\*Document version:\*\* (.+)/)[1].trim());
+const baseline=escape(source.match(/\*\*Baseline date:\*\* (.+)/)[1].trim());
+const inline=s=>escape(s.trim()).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const lines=source.split(/\r?\n/),sections=[];let body='',i=0;
+while(i<lines.length){
+ const line=lines[i];if(!line.trim()){i++;continue;}
+ const heading=line.match(/^(#{1,3}) (.+)$/);
+ if(heading){const level=heading[1].length,id=slug(heading[2]);if(level===2)sections.push({id,label:heading[2]});body+=`<h${level} id="${id}">${inline(heading[2])}</h${level}>\n`;i++;continue;}
+ if(line.startsWith('|')){
+  const rows=[];while(i<lines.length&&lines[i].startsWith('|')){const cells=lines[i++].split('|').slice(1,-1).map(c=>c.trim());if(cells.every(c=>/^:?-+:?$/.test(c)))continue;rows.push(cells);}
+  body+='<div class="table-wrap"><table><thead><tr>'+rows[0].map(c=>`<th>${inline(c)}</th>`).join('')+'</tr></thead><tbody>'+rows.slice(1).map(row=>'<tr>'+row.map(c=>`<td>${inline(c)}</td>`).join('')+'</tr>').join('')+'</tbody></table></div>';continue;
+ }
+ const ordered=/^\d+\. /.test(line),unordered=/^- /.test(line);
+ if(ordered||unordered){const tag=ordered?'ol':'ul',pattern=ordered?/^\d+\. /:/^- /;body+=`<${tag}>`;while(i<lines.length&&pattern.test(lines[i]))body+=`<li>${inline(lines[i++].replace(pattern,''))}</li>`;body+=`</${tag}>`;continue;}
+ const paragraph=[];while(i<lines.length&&lines[i].trim()&&!/^(#{1,3} |\||- |\d+\. )/.test(lines[i]))paragraph.push(lines[i++]);
+ body+='<p>'+paragraph.map((s,j)=>inline(s)+(s.endsWith('  ')?'<br>':j<paragraph.length-1?' ':'')).join('')+'</p>\n';
+}
+const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tribes · Living Rules v${version}</title><style>
+:root{font-family:Segoe UI,Arial,sans-serif;color:#223b43;background:#f0f3ef;line-height:1.65}*{box-sizing:border-box}body{margin:0}.bar{background:#10333d;color:#f7ecd6;padding:18px 30px;display:flex;align-items:center;justify-content:space-between;gap:15px}.bar strong{font:23px Georgia,serif;letter-spacing:3px}.bar small{font-size:11px;letter-spacing:1px;color:#b4cece;display:block}.tools{display:flex;gap:9px;flex-wrap:wrap}.tools a,.tools button{font:12px Segoe UI,sans-serif;color:#f7ecd6;text-decoration:none;border:1px solid #5d7d83;background:transparent;border-radius:6px;padding:8px 12px;cursor:pointer}.layout{display:grid;grid-template-columns:245px minmax(0,1050px);max-width:1390px;margin:auto;gap:30px;padding:30px}nav{position:sticky;top:20px;align-self:start;max-height:calc(100vh - 40px);overflow:auto;padding:8px 6px}nav h2{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#698184}nav a{display:block;color:#38585f;text-decoration:none;font-size:12px;padding:7px 8px;border-left:2px solid #cbd9d7}nav a:hover{background:#dde9e4;border-left-color:#a67435}main{background:white;padding:35px 42px;border:1px solid #d5dfd9;border-radius:12px;min-width:0}h1,h2,h3{font-family:Georgia,serif;line-height:1.25;color:#143b42;scroll-margin-top:20px}h1{font-size:36px;letter-spacing:-.6px;margin-top:0}h2{font-size:27px;margin:40px 0 18px;padding-top:12px;border-top:1px solid #dbe3df}h3{font-size:21px;margin-top:30px}p,li{font-size:14px}li{margin:7px 0}.table-wrap{overflow:auto;margin:18px 0 24px}table{border-collapse:collapse;width:100%;font-size:12px;line-height:1.5}th,td{padding:10px 12px;text-align:left;vertical-align:top;border:1px solid #d7e2dc}th{background:#e9f0eb;color:#24494b}tr:nth-child(even) td{background:#f8faf7}code{font-size:12px;background:#eef2ef;padding:2px 4px;border-radius:3px;overflow-wrap:anywhere}strong{color:#203f46}.bar strong{color:#f7ecd6}footer{color:#647e80;font-size:12px;margin:30px 0 0;border-top:1px solid #dbe3df;padding-top:15px}@media(max-width:850px){.layout{display:block;padding:15px}nav{position:static;max-height:none;columns:2;padding:0 0 20px}nav h2{column-span:all}nav a{break-inside:avoid}main{padding:25px}.bar{padding:15px;align-items:flex-start}h1{font-size:29px}}@media(max-width:500px){main{padding:20px 15px}nav{columns:1;max-height:220px;overflow:auto}.bar{flex-direction:column}th,td{min-width:110px}h1{font-size:27px}}@media print{.bar,nav{display:none}.layout{display:block;padding:0}body{background:white}main{border:0;padding:0}h2{break-after:avoid}tr{break-inside:avoid}table{font-size:10px}.table-wrap{overflow:visible}a{color:inherit}}
+</style></head><body><header class="bar"><div><strong>TRIBES</strong><small>LIVING RULEBOOK / VERSION ${version}</small></div><div class="tools"><a href="RULES.md" download>Download editable source</a><button onclick="window.print()">Print / save PDF</button><a href="./" target="_blank" rel="noopener">Open game</a></div></header><div class="layout"><nav aria-label="Rulebook contents"><h2>Contents</h2>${sections.map(s=>`<a href="#${s.id}">${escape(s.label)}</a>`).join('')}</nav><main>${body}<footer>Generated from RULES.md. Baseline: ${baseline}. Provisional choices and review items are explicitly recorded; this document does not silently change the game.</footer></main></div></body></html>`;
+await writeFile(new URL('rules-reference.html',import.meta.url),html);
+console.log(`Built rules-reference.html from ${lines.length} source lines; ${sections.length} main sections.`);

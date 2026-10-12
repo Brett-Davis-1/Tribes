@@ -1,14 +1,15 @@
 import {snapshot,initializeAudit,recordAudit,exportAudit} from './audit.mjs';
 export const RULESET='tribes-rules-2';
 export const GAME_VERSION=2;
+export const RULES_REVISION='2.3-leaders-2026-10-12';
 export const BIOMES=['Beach','Mangrove','Caldera'];
 export const LEADERS=[
- {id:'ku',name:'Ku Nuele',title:'The Flamekeeper',color:'#ed795d',pop:10,kn:5,tech:'hunter',bonus:'Hunter unlocked · +2 actions on your first turn',style:'Conqueror'},
- {id:'asinya',name:'Asinya',title:'The Lifegiver',color:'#39bd91',pop:16,kn:5,bonus:'Begin with 16 population',style:'Builder'},
+ {id:'ku',name:'Ku Nuele',title:'The Flamekeeper',color:'#ed795d',pop:10,kn:5,tech:'hunter',bonus:'Hunter unlocked · +1 attack',style:'Conqueror'},
+ {id:'asinya',name:'Asinya',title:'The Lifegiver',color:'#39bd91',pop:18,kn:5,bonus:'Begin with 18 population',style:'Builder'},
  {id:'herysi',name:'Herysi',title:'The Protector',color:'#99cc61',pop:10,kn:5,tech:'gatherer',bonus:'Gatherer unlocked · +1 defense',style:'Builder'},
  {id:'hecatl',name:'Hecatl',title:'The Pathfinder',color:'#e3b656',pop:10,kn:5,tech:'nomad',bonus:'Nomad unlocked · travel the sea routes',style:'Explorer'},
- {id:'tao',name:'Tao Zhe',title:'The Spiritwalker',color:'#b598ed',pop:10,kn:5,tech:'spiritual',bonus:'Spiritual unlocked · play two spirit cards per turn',style:'Scholar'},
- {id:'daikotei',name:'Daikotei',title:'The Blademaster',color:'#78b9e3',pop:10,kn:5,cards:2,bonus:'Begin with two spirit cards',style:'Conqueror'}
+ {id:'tao',name:'Tao Zhe',title:'The Spiritwalker',color:'#b598ed',pop:10,kn:3,tech:'spiritual',bonus:'Spiritual unlocked · play two spirit cards per turn',style:'Scholar'},
+ {id:'daikotei',name:'Daikotei',title:'The Blademaster',color:'#78b9e3',pop:10,kn:5,cards:2,bonus:'Begin with two spirit cards · additional cards cost 3 population',style:'Conqueror'}
 ];
 const tech=(id,name,cost,parents,branch,description)=>({id,name,cost,parents,branch,description});
 export const TECHS=[
@@ -35,7 +36,7 @@ export const TECHS=[
  tech('archery','Archery',7,['ferocity'],'War','Attack with two D6s instead of a D6 and a D4.'),
  tech('city','City',10,['tent','wisdom','fertility','ferocity'],'City','Upgrade a settlement for 10 population and 1 action. Hold a city until your next turn to win.')
 ];
-export const CARDS={fox:{name:'Cunning Fox',text:'Steal an eligible technology from a rival.'},jaguar:{name:'Swift Jaguar',text:'Gain 2 extra actions this turn.'},turtle:{name:'Guardian Turtle',text:'Automatically win a defensive battle. Play before dice are rolled.'},eagle:{name:'Soaring Eagle',text:'Travel to any location, with no action cost.'},owl:{name:'Wise Owl',text:'Gain 4 knowledge immediately.'},tiger:{name:'Fighting Tiger',text:'Teleport to an enemy settlement and attack for free.'}};
+export const CARDS={fox:{name:'Cunning Fox',text:'Learn an eligible rival technology for free. They keep it too.'},jaguar:{name:'Swift Jaguar',text:'Gain 2 extra actions this turn.'},turtle:{name:'Guardian Turtle',text:'Automatically win a defensive battle. Play before dice are rolled.'},eagle:{name:'Soaring Eagle',text:'Travel to any location, with no action cost.'},owl:{name:'Wise Owl',text:'Gain 4 knowledge immediately.'},tiger:{name:'Fighting Tiger',text:'Teleport to an enemy settlement and attack for free.'}};
 const coords=[[[594,318],[1024,315],[1302,619],[1302,1035],[985,1325],[577,1325],[285,1008],[305,595]],[[788,433],[1076,545],[1186,825],[1079,1098],[796,1208],[513,1098],[406,829],[520,545]],[[713,620],[885,620],[1020,742],[986,900],[876,1029],[700,1014],[588,902],[601,733]]];
 export const MAP=coords.flatMap((ring,r)=>ring.map(([x,y],i)=>({id:r*8+i,x:x/16,y:y/16,ring:r,index:i,name:['Beach','Mangrove','Caldera'][r]+' '+(i+1)})));
 export const EDGES=[];
@@ -50,6 +51,7 @@ export const owned=(s,p)=>s.tiles.filter(t=>t.owner===p.id);
 export const has=(p,id)=>p.techs.includes(id);
 export const income=(s,p)=>owned(s,p).reduce((v,t)=>(v[t.yield.type]+=t.yield.amount,v),{pop:1+(has(p,'fertility')?2:0),kn:1+(has(p,'wisdom')?2:0)});
 export const buildCost=(p,t)=>Math.max(0,[4,8,12][t.biome]-(has(p,'tent')?3:0));
+export const spiritCardCost=p=>p.leader==='daikotei'?3:5;
 export const attackCost=()=>0;
 export const diceSides=(p,defense=false)=>[6,has(p,defense?'shields':'archery')?6:4];
 export const neighbors=(s,p,id=p.pos)=>EDGES.filter(([a,b,h])=>(a===id||b===id)&&(!h||has(p,'nomad'))).map(([a,b])=>a===id?b:a);
@@ -58,12 +60,13 @@ function shuffle(s,list){const a=[...list];for(let i=a.length-1;i>0;i--){const j
 const die=(s,n)=>1+Math.floor(random(s)*n);
 function log(s,text,type='event'){s.log.unshift({text,type,turn:s.turn});s.log=s.log.slice(0,100);}
 function draw(s,p){if(!s.deck.length){s.deck=shuffle(s,s.discard);s.discard=[];}if(!s.deck.length)return false;p.cards.push(s.deck.pop());return true;}
-export function createGame({human='ku',opponents=2,seed=Date.now()>>>0,difficulty='normal'}={}){
- const s={version:GAME_VERSION,ruleset:RULESET,seed:seed||1,phase:'draft',turn:0,turnIndex:0,round:1,players:[],order:[],tiles:[],deck:[],discard:[],log:[],battle:null,result:null,difficulty};
- const chosen=[human,...shuffle(s,LEADERS.filter(l=>l.id!==human).map(l=>l.id)).slice(0,Math.max(1,Math.min(3,opponents)))];
+export function createGame({human='ku',opponents=2,seed=Date.now()>>>0,difficulty='normal',seats=null}={}){
+ if(seats&&(!Array.isArray(seats)||seats.length<2||seats.length>4||new Set(seats.map(p=>p.leader)).size!==seats.length||seats.some(p=>!LEADERS.some(l=>l.id===p.leader))))throw new Error('Choose two to four distinct leaders.');
+ const s={version:GAME_VERSION,ruleset:RULESET,rulesRevision:RULES_REVISION,seed:seed||1,phase:'draft',turn:0,turnIndex:0,round:1,players:[],order:[],tiles:[],deck:[],discard:[],log:[],battle:null,result:null,difficulty};
+ const chosen=seats?seats.map(p=>p.leader):[human,...shuffle(s,LEADERS.filter(l=>l.id!==human).map(l=>l.id)).slice(0,Math.max(1,Math.min(3,opponents)))];
  s.deck=shuffle(s,Object.keys(CARDS).flatMap(k=>Array(6).fill(k)));
  s.players=chosen.map((id,i)=>{const l=LEADERS.find(l=>l.id===id);return {id:i,human:i===0,leader:id,pop:l.pop,kn:l.kn,techs:l.tech?[l.tech]:[],cards:[],pos:null,ap:0,attacks:0,rested:false,preventedCities:[],played:0,warcry:false,teleports:0,tribute:false,turns:0,visited:[],claim:{settler:null,cities:{}},roll:die(s,6)};});
- s.players.forEach(p=>{for(let i=0;i<(leader(p).cards||0);i++)draw(s,p);});
+ s.players.forEach((p,i)=>{if(seats){p.human=!seats[i].bot;p.name=seats[i].name;}for(let i=0;i<(leader(p).cards||0);i++)draw(s,p);});
  s.order=s.players.map(p=>p.id).sort((a,b)=>s.players[b].roll-s.players[a].roll||a-b);
  const pool=BIOMES.flatMap((_,biome)=>Array.from({length:10},(_,i)=>({tileId:`${biome}-${i}`,biome,yield:{type:i<5?'pop':'kn',amount:i<5?[1,2,4][biome]:[1,2,3][biome]}})));
  s.tiles=shuffle(s,pool).slice(0,24).map((tile,i)=>({...MAP[i],...tile,name:`${BIOMES[tile.biome]} · Space ${i+1}`,revealed:false,owner:null,city:false}));
@@ -73,7 +76,7 @@ export function createGame({human='ku',opponents=2,seed=Date.now()>>>0,difficult
 }
 export const auditState=s=>snapshot(s,income);
 export function ensureAudit(s,options={legacy:true}){
- if(!s.audit)initializeAudit(s,auditState(s),{leaders:LEADERS,technologies:TECHS,cards:CARDS,assumptions:['24 randomly selected from a pooled 30 tiles, shuffled across all spaces. Pool provisionally has ten per biome, five population and five knowledge each.','Beach yields 1; mangrove 2; caldera 4 population or 3 knowledge.','Base combat D6 + D4; Archery and Shields upgrade the relevant roll to 2D6 per Brett’s clarification.','Population commitments are public, adjustable in steps of 2, and finalized when both sides confirm. Any change resets both confirmations; committed population is spent at resolution, including Guardian Turtle battles.','Nomad opens coastal routes for 1 action. Boat numbers are not applied.','Spirit deck: six of each of six card types; discards are reshuffled when empty.','Kn Tree - Current (5).png is the technology source, with the explicit dice override; Armor proposal withdrawn.','Kingmaker: capture cities during their holding period at two distinct board locations; Science: hold 40 knowledge, both immediate.','Technology theft keeps descendants and existing cities but does not replay one-time rewards.']},options);
+ if(!s.audit)initializeAudit(s,auditState(s),{rulesRevision:RULES_REVISION,leaders:LEADERS,technologies:TECHS,cards:CARDS,assumptions:['24 randomly selected from a pooled 30 tiles, shuffled across all spaces. Pool provisionally has ten per biome, five population and five knowledge each.','Beach yields 1; mangrove 2; caldera 4 population or 3 knowledge.','Base combat D6 + D4; Archery and Shields upgrade the relevant roll to 2D6 per Brett’s clarification.','Population commitments are public, adjustable in steps of 2, and finalized when both sides confirm. Any change resets both confirmations; committed population is spent at resolution, including Guardian Turtle battles.','Nomad opens coastal routes for 1 action. Boat numbers are not applied.','Spirit deck: six of each of six card types; discards are reshuffled when empty.','Kn Tree - Current (5).png is the technology source, with the explicit dice override; Armor proposal withdrawn.','Kingmaker: capture cities during their holding period at two distinct board locations; Science: hold 40 knowledge, both immediate.','Cunning Fox learns an eligible rival technology for free without removing it or its benefits from the rival. Normal learning effects apply once to the recipient; already-owned technologies cannot be copied.']},options);
  return s.audit;
 }
 export function gameAudit(s){ensureAudit(s);return exportAudit(s,auditState(s));}
@@ -86,7 +89,7 @@ function auditActionDetails(s,a){
  if(a.type==='battleOffer')return {player:a.player,proposedPopulation:a.population,bonus:a.population/2,previousPopulation:s.battle.offers[a.player],chargedNow:0};
  if(a.type==='battleReady')return {player:a.player,population:s.battle.offers[a.player],turtle:!!a.turtle};
  if(a.type==='research')return {technology:TECHS.find(t=>t.id===a.tech),cost:{knowledge:TECHS.find(t=>t.id===a.tech)?.cost}};
- if(a.type==='buyCard')return {cost:{population:5},deckCountBefore:s.deck.length,discardCountBefore:s.discard.length};
+ if(a.type==='buyCard')return {cost:{population:spiritCardCost(p)},deckCountBefore:s.deck.length,discardCountBefore:s.discard.length};
  if(a.type==='tribute')return {yields:(a.tiles||[]).map(id=>({tile:id,yield:s.tiles[id]?.yield}))};
  if(a.type==='card')return {card:CARDS[a.card],targetTile:a.tile??null,targetPlayer:a.player??null,targetTechnology:a.tech??null,cost:{actions:0,population:0}};
  if(a.type==='resolve'){
@@ -101,6 +104,8 @@ export function act(s,a){
  // Details are computed only for actions that can enter their corresponding phase.
  const details=(s.phase==='playing'&&a.type!=='resolve')||(s.phase==='battle'&&['resolve','battleOffer','battleReady'].includes(a.type))?auditActionDetails(s,a):{};
  const result=applyAction(s,a);if(!result.ok)return result;
+ s.rulesRevision=RULES_REVISION;details.rulesRevision=RULES_REVISION;
+ if(a.type==='card'&&a.card==='fox')details.technologyLearning={mode:'copy',sourcePlayer:a.player,technology:a.tech,sourceKeepsTechnology:true,normalLearningEffects:true,knowledgeCost:0};
  // Legacy saves start a truthful baseline before the first newly recorded action.
  if(!s.audit){initializeAudit(s,before,{leaders:LEADERS,technologies:TECHS,cards:CARDS,assumptions:['Legacy match: original setup seed and earlier actions are unavailable.']},{legacy:true});}
  const after=auditState(s),markerIndex=s.log.indexOf(marker),messages=s.log.slice(0,markerIndex<0?s.log.length:markerIndex).map(e=>e.text).reverse();
@@ -110,7 +115,7 @@ export function act(s,a){
  const startsTurn=(before.phase==='draft'&&s.phase==='playing')||(a.type==='end'&&s.phase==='playing');
  if(startsTurn){
   const startBefore=auditState(s),p=active(s),sources=[{source:'Base income',population:1,knowledge:1},...(has(p,'fertility')?[{source:'Fertility',population:2,knowledge:0}]:[]),...(has(p,'wisdom')?[{source:'Wisdom',population:0,knowledge:2}]:[]),...owned(s,p).map(t=>({source:t.name,population:t.yield.type==='pop'?t.yield.amount:0,knowledge:t.yield.type==='kn'?t.yield.amount:0}))];
-  beginTurn(s);recordAudit(s,{type:s.phase==='won'?'victory':'turn_start',actor:p.id,before:startBefore,after:auditState(s),description:s.log[0].text,details:s.phase==='won'?{winner:s.winner,victory:s.victory}:{incomeSources:sources,actionAllowance:{base:2,stamina:has(p,'stamina')?1:0,firstTurnKuNuele:p.leader==='ku'&&p.turns===1?2:0},resets:['rest allowance','attack count','spirit cards played this turn','War Cry temporary bonus']}});
+  beginTurn(s);recordAudit(s,{type:s.phase==='won'?'victory':'turn_start',actor:p.id,before:startBefore,after:auditState(s),description:s.log[0].text,details:s.phase==='won'?{winner:s.winner,victory:s.victory}:{incomeSources:sources,actionAllowance:{base:2,stamina:has(p,'stamina')?1:0,firstTurnKuNuele:0},resets:['rest allowance','attack count','spirit cards played this turn','War Cry temporary bonus']}});
  }
  checkImmediateVictory(s);
  return result;
@@ -127,12 +132,14 @@ function beginTurn(s){
  const p=active(s);syncClaims(s);
  const victory=p.claim.settler!==null&&p.claim.settler<s.turn?'Settler':Object.values(p.claim.cities).some(v=>v<s.turn)?'City':null;
  if(victory){win(s,p,victory);return;}
- p.turns++;p.ap=2+(has(p,'stamina')?1:0)+(p.leader==='ku'&&p.turns===1?2:0);p.attacks=0;p.rested=false;p.played=0;p.warcry=false;p.visited=[p.pos];const y=income(s,p);p.pop+=y.pop;p.kn+=y.kn;
+ p.turns++;p.ap=2+(has(p,'stamina')?1:0);p.attacks=0;p.rested=false;p.played=0;p.warcry=false;p.visited=[p.pos];const y=income(s,p);p.pop+=y.pop;p.kn+=y.kn;
  log(s,`${leader(p).name} collects ${y.pop} population and ${y.kn} knowledge.`,'income');
 }
 export function canResearch(p,id){const t=TECHS.find(t=>t.id===id);return !!t&&!has(p,id)&&p.kn>=t.cost&&(!t.parents.length||t.parents.some(id=>has(p,id)));}
-export function stealable(s,p){return s.players.filter(q=>q.id!==p.id).flatMap(q=>q.techs.filter(id=>{const t=TECHS.find(t=>t.id===id);return !has(p,id)&&(!t.parents.length||t.parents.some(id=>has(p,id)));}).map(id=>({player:q.id,tech:id})));}
-function grantTech(s,p,id,stolen=false){p.techs.push(id);if(id==='stamina')p.ap++;if(stolen)return;if(id==='growth')p.pop+=5;if(id==='offering')draw(s,p);if(id==='wayfinder')p.teleports++;if(id==='tribute')p.tribute=true;if(id==='warcry')p.warcry=true;}
+export function copyableTechnologies(s,p){return s.players.filter(q=>q.id!==p.id).flatMap(q=>q.techs.filter(id=>{const t=TECHS.find(t=>t.id===id);return !has(p,id)&&(!t.parents.length||t.parents.some(id=>has(p,id)));}).map(id=>({player:q.id,tech:id})));}
+// Compatibility for archived bot policies; current UI and AI use the copy name.
+export const stealable=copyableTechnologies;
+function grantTech(s,p,id){p.techs.push(id);if(id==='stamina')p.ap++;if(id==='growth')p.pop+=5;if(id==='offering')draw(s,p);if(id==='wayfinder')p.teleports++;if(id==='tribute')p.tribute=true;if(id==='warcry')p.warcry=true;}
 const fail=message=>({ok:false,message});
 function attack(s,p,t,free=false){
  if(t.owner===null||t.owner===p.id)return fail('Choose a rival settlement.');
@@ -194,15 +201,15 @@ function applyAction(s,a){
  case 'research':if(!canResearch(p,a.tech))return fail('This technology requires more knowledge or a prerequisite.');p.kn-=TECHS.find(t=>t.id===a.tech).cost;grantTech(s,p,a.tech);log(s,`${leader(p).name} unlocks ${TECHS.find(t=>t.id===a.tech).name}.`,'research');break;
  case 'teleport':if(!p.teleports||!s.tiles[a.tile])return fail('No Wayfinder journey available.');p.teleports--;p.pos=a.tile;p.visited.push(a.tile);log(s,`${leader(p).name} uses Wayfinder to reach ${s.tiles[a.tile].name}.`);break;
  case 'tribute':{const ids=[...new Set(a.tiles||[])];if(!p.tribute||ids.length<1||ids.length>2||ids.some(id=>s.tiles[id]?.owner!==p.id))return fail('Choose one or two of your settlements.');ids.forEach(id=>{const y=s.tiles[id].yield;p[y.type]+=y.amount;});p.tribute=false;log(s,`${leader(p).name} collects Tribute.`);break;}
- case 'buyCard':if(p.pop<5||(!s.deck.length&&!s.discard.length))return fail('A spirit card costs 5 population; the deck must have a card.');p.pop-=5;draw(s,p);log(s,`${leader(p).name} draws a spirit card.`,'spirit');break;
+ case 'buyCard':if(p.pop<spiritCardCost(p)||(!s.deck.length&&!s.discard.length))return fail('A spirit card costs '+spiritCardCost(p)+' population; the deck must have a card.');p.pop-=spiritCardCost(p);draw(s,p);log(s,`${leader(p).name} draws a spirit card.`,'spirit');break;
  case 'card':{
   const k=a.card;if(!p.cards.includes(k)||k==='turtle'||p.played>=(has(p,'spiritual')?2:1))return fail('You cannot play that card now.');
   if(['eagle','tiger'].includes(k)&&!s.tiles[a.tile])return fail('Choose a target location.');
   if(k==='tiger'&&(s.tiles[a.tile].owner===null||s.tiles[a.tile].owner===p.id))return fail('Choose an enemy settlement.');
-  if(k==='fox'&&!stealable(s,p).some(v=>v.player===a.player&&v.tech===a.tech))return fail('Choose an eligible rival technology.');
+  if(k==='fox'&&!copyableTechnologies(s,p).some(v=>v.player===a.player&&v.tech===a.tech))return fail('Choose an eligible rival technology.');
   p.cards.splice(p.cards.indexOf(k),1);s.discard.push(k);p.played++;log(s,`${leader(p).name} invokes ${CARDS[k].name}.`,'spirit');
   if(k==='jaguar')p.ap+=2;if(k==='owl')p.kn+=4;if(k==='eagle')p.pos=a.tile;
-  if(k==='fox'){const q=s.players[a.player];q.techs=q.techs.filter(id=>id!==a.tech);if(a.tech==='stamina')q.ap=Math.max(0,q.ap-1);if(a.tech==='wayfinder')q.teleports=0;if(a.tech==='tribute')q.tribute=false;if(a.tech==='warcry')q.warcry=false;grantTech(s,p,a.tech,true);log(s,`${leader(p).name} steals ${TECHS.find(t=>t.id===a.tech).name} from ${leader(q).name}.`,'spirit');}
+  if(k==='fox'){const q=s.players[a.player];grantTech(s,p,a.tech);log(s,`${leader(p).name} learns ${TECHS.find(t=>t.id===a.tech).name} for free from ${leader(q).name}. ${leader(q).name} keeps the technology.`,'spirit');}
   if(k==='tiger')return attack(s,p,s.tiles[a.tile],true);break;
  }
  case 'end':syncClaims(s);s.turnIndex=(s.turnIndex+1)%s.players.length;s.turn++;if(!s.turnIndex)s.round++;break;
@@ -365,7 +372,7 @@ function hardAction(s){
  if(card('fox')){
   const goal=[...style.opening,...style.research].find(id=>!has(p,id));
   const path=cityResearchPath(p,goal||'city').ids;
-  const options=stealable(s,p).map(o=>({...o,value:TECHS.find(t=>t.id===o.tech).cost+(path.includes(o.tech)?12:0)+(['stamina','wisdom','tent'].includes(o.tech)?5:0)})).sort((a,b)=>b.value-a.value);
+  const options=copyableTechnologies(s,p).map(o=>({...o,value:TECHS.find(t=>t.id===o.tech).cost+(path.includes(o.tech)?12:0)+(['stamina','wisdom','tent'].includes(o.tech)?5:0)})).sort((a,b)=>b.value-a.value);
   if(options.length)return {type:'card',card:'fox',player:options[0].player,tech:options[0].tech};
  }
  if(card('owl'))return {type:'card',card:'owl'};
@@ -387,7 +394,7 @@ function hardAction(s){
   if(best?.action==='guard'&&best.distance>0&&p.ap>0)return {type:'move',tile:best.path[1]};
   if(p.ap>0&&!p.rested)return {type:'rest'};
   // Spend surplus population on a defensive card while holding a claim.
-  if(!p.cards.includes('turtle')&&p.pop>=15&&p.cards.length<4&&(s.deck.length||s.discard.length))return {type:'buyCard'};
+  if(!p.cards.includes('turtle')&&p.pop>=10+spiritCardCost(p)&&p.cards.length<4&&(s.deck.length||s.discard.length))return {type:'buyCard'};
   return {type:'end'};
  }
  if(best?.score>0&&best.action!=='guard'){
@@ -403,7 +410,7 @@ function hardAction(s){
  }
  if(p.ap>0&&!p.rested)return {type:'rest'};
  const cardReserve=['tao','daikotei'].includes(p.leader)?8:15;
- if(p.pop>=cardReserve+5&&p.cards.length<2&&(s.deck.length||s.discard.length))return {type:'buyCard'};
+ if(p.pop>=cardReserve+spiritCardCost(p)&&p.cards.length<2&&(s.deck.length||s.discard.length))return {type:'buyCard'};
  return {type:'end'};
 }
 export function aiBattleAction(s,id){
@@ -432,14 +439,14 @@ export function aiAction(s){
  if(canCard&&p.cards.includes('tiger')&&imminent.length)return {type:'card',card:'tiger',tile:imminent[0].id};
  if(canCard&&p.cards.includes('owl'))return {type:'card',card:'owl'};
  if(canCard&&p.cards.includes('jaguar')&&p.ap===0)return {type:'card',card:'jaguar'};
- if(canCard&&p.cards.includes('fox')){const candidates=stealable(s,p).sort((a,b)=>TECHS.find(t=>t.id===b.tech).cost-TECHS.find(t=>t.id===a.tech).cost);if(candidates.length)return {type:'card',card:'fox',...candidates[0]};}
+ if(canCard&&p.cards.includes('fox')){const candidates=copyableTechnologies(s,p).sort((a,b)=>TECHS.find(t=>t.id===b.tech).cost-TECHS.find(t=>t.id===a.tech).cost);if(candidates.length)return {type:'card',card:'fox',...candidates[0]};}
  if(p.tribute&&mine.length)return {type:'tribute',tiles:[...mine].sort((a,b)=>b.yield.amount-a.yield.amount).slice(0,2).map(t=>t.id)};
  if(p.ap>0&&has(p,'city')&&t.owner===p.id&&!t.city&&p.pop>=10)return {type:'city'};
  const priorities=l.style==='Conqueror'?['hunter','spoils','ferocity','city','archery','wartribe']:l.style==='Explorer'?['nomad','stamina','tent','city','rally']:l.style==='Scholar'?['spiritual','growth','wisdom','city','shields']:['gatherer','harvest','fertility','city','wartribe'];
  // Easy opponents invest less consistently. Every difficulty obeys the same economy and hidden information.
  const planned=priorities.find(id=>!has(p,id));
  if(p.kn<30&&planned&&canResearch(p,planned)&&(s.difficulty!=='easy'||random(s)>.45))return {type:'research',tech:planned};
- if(p.ap===0){if(p.pop>14&&p.cards.length<3&&s.deck.length)return {type:'buyCard'};return {type:'end'};}
+ if(p.ap===0){if(p.pop>=10+spiritCardCost(p)&&p.cards.length<3&&s.deck.length)return {type:'buyCard'};return {type:'end'};}
  if(t.owner!==null&&t.owner!==p.id&&p.pop>=attackCost(t)&&(p.attacks<2||imminent.some(e=>e.id===t.id)))return {type:'attack'};
  if(t.owner===null&&p.pop>=buildCost(p,t))return {type:'build'};
  const goals=s.tiles.filter(g=>g.id!==p.pos).map(g=>{

@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Tribes · Isolated UI checks</title><style>body{font:18px system-ui;background:#10333d;color:#f7ecd6;padding:40px}button{font:inherit;padding:15px;margin:10px}p{max-width:650px}</style><h1>Isolated UI checks</h1><p>These scenarios use a separate test save and do not write game audit history or replace your normal match.</p><button data-test="attack">Public attack commitments</button><button data-test="defend">Public defense commitments</button><button data-test="cardPrice">Daikotei 3-pop card purchase</button><button data-test="science">Immediate Science victory</button><button data-test="combatStats">Tribe combat advantages</button><button data-test="tileOwners">Tile ownership portraits</button><button data-test="foxCopy">Cunning Fox copies technology</button><button data-test="knowledgeTree">Knowledge tree and resource icons</button><script type="module">
+import {createGame,act,active} from './engine.mjs';
+document.addEventListener('click',e=>{
+ const kind=e.target.dataset.test;if(!kind)return;
+ const s=createGame({human:'ku',opponents:kind==='knowledgeTree'?3:1,seed:52});while(s.phase==='draft')act(s,{type:'place',tile:active(s).id});
+ s.turnIndex=s.order.indexOf(0);s.players.forEach(p=>{p.techs=[];p.cards=[];p.ap=3;p.pop=14;p.kn=5;});
+ const me=s.players[0],rival=s.players[1];me.pos=0;rival.pos=1;s.tiles[0].biome=0;
+ if(kind==='cardPrice'){me.leader='daikotei';me.pop=3;me.ap=0;}
+ else if(kind==='foxCopy'){me.techs=['hunter','spoils','ferocity'];me.cards=['fox'];me.kn=0;rival.techs=['hunter','spoils','ferocity','archery'];}
+ else if(kind==='knowledgeTree'){
+  me.kn=30;me.techs=['nomad','stamina','hunter','spiritual'];rival.techs=['nomad','wisdom','shields','city'];
+  s.players[2].techs=['nomad','gatherer','fertility','wartribe'];s.players[3].techs=['nomad','hunter','ferocity','archery'];
+  for(const [id,owner,type,amount] of [[0,0,'pop',3],[8,0,'kn',3],[1,1,'pop',4],[9,1,'kn',1]]){Object.assign(s.tiles[id],{owner,revealed:true,yield:{type,amount}});}
+ }
+ else if(kind==='tileOwners'){for(const [id,owner] of [[0,0],[8,0],[16,0],[1,1],[9,1],[17,1]]){s.tiles[id].owner=owner;s.tiles[id].revealed=true;}s.tiles[16].city=true;}
+ else if(kind==='combatStats'){rival.techs=['hunter','ferocity','wartribe','archery','gatherer','shields'];me.techs=['hunter'];me.warcry=true;}
+ else if(kind==='science'){me.kn=39;me.rested=false;}
+ else if(kind==='attack'){s.tiles[0].owner=rival.id;s.tiles[0].revealed=true;act(s,{type:'attack'});}
+ else{s.turnIndex=s.order.indexOf(1);rival.pos=0;s.tiles[0].owner=me.id;s.tiles[0].revealed=true;me.cards=['turtle'];act(s,{type:'attack'});}
+ localStorage.setItem('tribes-island-ui-test',JSON.stringify(s));location.href='/?playtest=1';
+});
+</script></html>
