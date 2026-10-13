@@ -28,6 +28,14 @@ The game can be restarted using `Start Tribes.cmd` on Windows. Leave the server 
 - Three difficulty settings (Relaxed, Standard, Hard), fast turns, a chronicle, and local save/resume. Hard uses victory planning, public combat odds, resource reserves and claim interception without resource or dice bonuses.
 - Responsive interface, reduced-motion support and animated leader movement.
 
+## UI update - October 12, 2026
+
+- Board artwork uses `assets/board-clean.png`: boats and printed dotted sea paths removed. Original artwork remains in `assets/board.png`. Legal movement routes still appear for the active player; Nomad mechanics are unchanged.
+- Every tribe card shows current population/knowledge totals beside per-turn income, including base income, settlements and learned technologies.
+- Settlement owner portraits use house-shaped badges; moving leaders keep round pawns. City badges remain visible.
+- Larger tile yields use repeated blue population / purple knowledge icons. Hover changes the outline while keeping the biome background opaque.
+- These are display changes only; rules, bots, saved matches and multiplayer commands are unchanged.
+
 ## Provisional rules to confirm
 
 The user confirmed random selection of 24 from 30 tiles and requested omission of King Slayer. The following other details remain assumptions and are disclosed in **How to play**:
