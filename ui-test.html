@@ -1,11 +1,13 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><title>Tribes · Isolated UI checks</title><style>body{font:18px system-ui;background:#10333d;color:#f7ecd6;padding:40px}button{font:inherit;padding:15px;margin:10px}p{max-width:650px}</style><h1>Isolated UI checks</h1><p>These scenarios use a separate test save and do not write game audit history or replace your normal match.</p><button data-test="attack">Public attack commitments</button><button data-test="defend">Public defense commitments</button><button data-test="cardPrice">Daikotei 3-pop card purchase</button><button data-test="science">Immediate Science victory</button><button data-test="combatStats">Tribe combat advantages</button><button data-test="tileOwners">Tile ownership portraits</button><button data-test="foxCopy">Cunning Fox copies technology</button><button data-test="knowledgeTree">Knowledge tree and resource icons</button><script type="module">
 import {createGame,act,active} from './engine.mjs';
+const libraryCheck=document.createElement('button');libraryCheck.dataset.test='libraryVictory';libraryCheck.textContent='Third permanent library victory';document.body.insertBefore(libraryCheck,document.querySelector('script'));
 document.addEventListener('click',e=>{
  const kind=e.target.dataset.test;if(!kind)return;
- const s=createGame({human:'ku',opponents:kind==='knowledgeTree'?3:1,seed:52});while(s.phase==='draft')act(s,{type:'place',tile:active(s).id});
+ const s=createGame({human:'ku',opponents:kind==='knowledgeTree'?3:kind==='libraryVictory'?2:1,seed:52});while(s.phase==='draft')act(s,{type:'place',tile:active(s).id});
  s.turnIndex=s.order.indexOf(0);s.players.forEach(p=>{p.techs=[];p.cards=[];p.ap=3;p.pop=14;p.kn=5;});
  const me=s.players[0],rival=s.players[1];me.pos=0;rival.pos=1;s.tiles[0].biome=0;
- if(kind==='cardPrice'){me.leader='daikotei';me.pop=3;me.ap=0;}
+ if(kind==='libraryVictory'){me.techs=['city','beachLibrary','mangroveLibrary','calderaLibrary'];me.libraries=[{biome:1,tile:8,turn:0},{biome:2,tile:16,turn:0}];s.tiles[0].owner=me.id;s.tiles[0].revealed=true;s.tiles[8].libraryOwners=[me.id];s.tiles[16].libraryOwners=[me.id];}
+ else if(kind==='cardPrice'){me.leader='daikotei';me.pop=3;me.ap=0;}
  else if(kind==='foxCopy'){me.techs=['hunter','spoils','ferocity'];me.cards=['fox'];me.kn=0;rival.techs=['hunter','spoils','ferocity','archery'];}
  else if(kind==='knowledgeTree'){
   me.kn=30;me.techs=['nomad','stamina','hunter','spiritual'];rival.techs=['nomad','wisdom','shields','city'];

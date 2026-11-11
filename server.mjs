@@ -7,7 +7,7 @@ import {RoomService,roomAPI} from './multiplayer-server.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const mime={'.html':'text/html','.css':'text/css','.mjs':'text/javascript','.js':'text/javascript','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml'};
 // The public site must never expose databases, server code, or audit archives.
-const publicFiles=new Set(['index.html','styles.css','app.mjs','engine.mjs','audit.mjs','audit-store.mjs','knowledge-tree.mjs','resource-icons.mjs','multiplayer-client.mjs','rules-reference.html','ui-test.html','rules-history/engine-v1/engine.mjs','rules-history/engine-v1/audit.mjs']);
+const publicFiles=new Set(['index.html','board-maps.mjs','RULES.md','styles.css','app.mjs','engine.mjs','audit.mjs','audit-store.mjs','knowledge-tree.mjs','resource-icons.mjs','multiplayer-client.mjs','rules-reference.html','ui-test.html','rules-history/engine-v1/engine.mjs','rules-history/engine-v1/audit.mjs','rules-history/engine-v2/engine.mjs','rules-history/engine-v2/audit.mjs']);
 export function createTribesServer(options={}){
  const rooms=new RoomService({filename:process.env.TRIBES_DB||path.join(root,'data','tribes.sqlite'),...options}),api=roomAPI(rooms);
  const server=http.createServer(async(req,res)=>{

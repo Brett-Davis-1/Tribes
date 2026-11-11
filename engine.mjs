@@ -1,7 +1,8 @@
+import {aiAction as classicAI,aiBattleAction as classicBattleAI} from './rules-history/engine-v2/engine.mjs';
 import {snapshot,initializeAudit,recordAudit,exportAudit} from './audit.mjs';
-export const RULESET='tribes-rules-2';
-export const GAME_VERSION=2;
-export const RULES_REVISION='2.3-leaders-2026-10-12';
+export const RULESET='tribes-rules-3';
+export const GAME_VERSION=3;
+export const RULES_REVISION='3.0-libraries-player-count-2026-11-11';
 export const BIOMES=['Beach','Mangrove','Caldera'];
 export const LEADERS=[
  {id:'ku',name:'Ku Nuele',title:'The Flamekeeper',color:'#ed795d',pop:10,kn:5,tech:'hunter',bonus:'Hunter unlocked · +1 attack',style:'Conqueror'},
@@ -13,7 +14,7 @@ export const LEADERS=[
 ];
 const tech=(id,name,cost,parents,branch,description)=>({id,name,cost,parents,branch,description});
 export const TECHS=[
- tech('nomad','Nomad',5,[],'Journey','Use hidden sea routes between neighboring outer spaces.'),
+ tech('nomad','Nomad',5,[],'Journey','Use hidden routes between neighboring outer spaces and between neighboring middle-ring spaces.'),
  tech('stamina','Stamina',2,['nomad'],'Journey','Gain +1 action each turn, including this turn.'),
  tech('wayfinder','Wayfinder',1,['nomad'],'Journey','Once: teleport your leader to any location.'),
  tech('tent','Tent Culture',5,['stamina','wayfinder'],'Journey','Building settlements costs 3 less population.'),
@@ -36,25 +37,32 @@ export const TECHS=[
  tech('archery','Archery',7,['ferocity'],'War','Attack with two D6s instead of a D6 and a D4.'),
  tech('city','City',10,['tent','wisdom','fertility','ferocity'],'City','Upgrade a settlement for 10 population and 1 action. Hold a city until your next turn to win.')
 ];
+export const LIBRARY_TECHS=['beachLibrary','mangroveLibrary','calderaLibrary'];
+TECHS.push(...LIBRARY_TECHS.map((id,biome)=>tech(id,BIOMES[biome]+' Library',8,['city'],'Science','Research this library type, then construct it at your '+BIOMES[biome]+' settlement for 1 AP, 0 population and 0 knowledge. The library permanently belongs to its builder. Complete all three biome libraries to win immediately.')));
+export const libraryBuilt=(p,biome)=>(p.libraries||[]).some(l=>l.biome===biome);
+export const libraryReady=(p,biome)=>p.libraryRules&&has(p,'city')&&(has(p,LIBRARY_TECHS[biome])||canResearch(p,LIBRARY_TECHS[biome]));
 export const CARDS={fox:{name:'Cunning Fox',text:'Learn an eligible rival technology for free. They keep it too.'},jaguar:{name:'Swift Jaguar',text:'Gain 2 extra actions this turn.'},turtle:{name:'Guardian Turtle',text:'Automatically win a defensive battle. Play before dice are rolled.'},eagle:{name:'Soaring Eagle',text:'Travel to any location, with no action cost.'},owl:{name:'Wise Owl',text:'Gain 4 knowledge immediately.'},tiger:{name:'Fighting Tiger',text:'Teleport to an enemy settlement and attack for free.'}};
-const coords=[[[594,318],[1024,315],[1302,619],[1302,1035],[985,1325],[577,1325],[285,1008],[305,595]],[[788,433],[1076,545],[1186,825],[1079,1098],[796,1208],[513,1098],[406,829],[520,545]],[[713,620],[885,620],[1020,742],[986,900],[876,1029],[700,1014],[588,902],[601,733]]];
-export const MAP=coords.flatMap((ring,r)=>ring.map(([x,y],i)=>({id:r*8+i,x:x/16,y:y/16,ring:r,index:i,name:['Beach','Mangrove','Caldera'][r]+' '+(i+1)})));
-export const EDGES=[];
-for(let i=0;i<8;i++){
- EDGES.push([i,8+i,false],[i,8+(i+7)%8,false]);
- EDGES.push([8+i,16+i,false],[8+i,16+(i+1)%8,false]);
- EDGES.push([16+i,16+(i+1)%8,false],[i,(i+1)%8,true]);
-}
+import {MAP24,EDGES24,MAP30,EDGES30,MIDDLE24} from './board-maps.mjs';
+// Legacy exports describe the two-player layout; game-aware code uses these helpers.
+export const MAP=MAP24,EDGES=EDGES24;
+export const libraryRules=s=>s.players.length>=3;
+export const settlementTarget=s=>s.players.length===4?5:6;
+export const cityDefense=s=>libraryRules(s)?2:1;
+export const gameMap=s=>s.players.length===4?MAP30:MAP24;
+export const gameEdges=s=>s.players.length===4?EDGES30:libraryRules(s)?[...EDGES24,...MIDDLE24]:EDGES24;
+export const availableTechs=s=>TECHS.filter(t=>libraryRules(s)||!LIBRARY_TECHS.includes(t.id));
+export const technologyDescription=(s,t)=>t.id==='city'?`Upgrade a settlement for 10 population and 1 action. Adds +${cityDefense(s)} defense. Hold until your next turn to win.`:t.id==='nomad'?`Use hidden routes on the outer${libraryRules(s)?' and middle':''} ring for 1 AP.`:t.description;
 export const leader=p=>LEADERS.find(l=>l.id===p.leader);
 export const active=s=>s.players[s.order[s.turnIndex]];
 export const owned=(s,p)=>s.tiles.filter(t=>t.owner===p.id);
 export const has=(p,id)=>p.techs.includes(id);
 export const income=(s,p)=>owned(s,p).reduce((v,t)=>(v[t.yield.type]+=t.yield.amount,v),{pop:1+(has(p,'fertility')?2:0),kn:1+(has(p,'wisdom')?2:0)});
+export const cityCost=()=>10;
 export const buildCost=(p,t)=>Math.max(0,[4,8,12][t.biome]-(has(p,'tent')?3:0));
 export const spiritCardCost=p=>p.leader==='daikotei'?3:5;
 export const attackCost=()=>0;
 export const diceSides=(p,defense=false)=>[6,has(p,defense?'shields':'archery')?6:4];
-export const neighbors=(s,p,id=p.pos)=>EDGES.filter(([a,b,h])=>(a===id||b===id)&&(!h||has(p,'nomad'))).map(([a,b])=>a===id?b:a);
+export const neighbors=(s,p,id=p.pos)=>gameEdges(s).filter(([a,b,h])=>(a===id||b===id)&&(!h||has(p,'nomad'))).map(([a,b])=>a===id?b:a);
 export function random(s){let x=s.seed|0;x^=x<<13;x^=x>>>17;x^=x<<5;s.seed=x>>>0;return s.seed/4294967296;}
 function shuffle(s,list){const a=[...list];for(let i=a.length-1;i>0;i--){const j=Math.floor(random(s)*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 const die=(s,n)=>1+Math.floor(random(s)*n);
@@ -65,18 +73,18 @@ export function createGame({human='ku',opponents=2,seed=Date.now()>>>0,difficult
  const s={version:GAME_VERSION,ruleset:RULESET,rulesRevision:RULES_REVISION,seed:seed||1,phase:'draft',turn:0,turnIndex:0,round:1,players:[],order:[],tiles:[],deck:[],discard:[],log:[],battle:null,result:null,difficulty};
  const chosen=seats?seats.map(p=>p.leader):[human,...shuffle(s,LEADERS.filter(l=>l.id!==human).map(l=>l.id)).slice(0,Math.max(1,Math.min(3,opponents)))];
  s.deck=shuffle(s,Object.keys(CARDS).flatMap(k=>Array(6).fill(k)));
- s.players=chosen.map((id,i)=>{const l=LEADERS.find(l=>l.id===id);return {id:i,human:i===0,leader:id,pop:l.pop,kn:l.kn,techs:l.tech?[l.tech]:[],cards:[],pos:null,ap:0,attacks:0,rested:false,preventedCities:[],played:0,warcry:false,teleports:0,tribute:false,turns:0,visited:[],claim:{settler:null,cities:{}},roll:die(s,6)};});
+ s.players=chosen.map((id,i)=>{const l=LEADERS.find(l=>l.id===id);return {id:i,human:i===0,leader:id,pop:l.pop,kn:l.kn,techs:l.tech?[l.tech]:[],cards:[],pos:null,ap:0,attacks:0,rested:false,preventedCities:[],libraryRules:chosen.length>=3,libraries:[],played:0,warcry:false,teleports:0,tribute:false,turns:0,visited:[],claim:{settler:null,cities:{}},roll:die(s,6)};});
  s.players.forEach((p,i)=>{if(seats){p.human=!seats[i].bot;p.name=seats[i].name;}for(let i=0;i<(leader(p).cards||0);i++)draw(s,p);});
  s.order=s.players.map(p=>p.id).sort((a,b)=>s.players[b].roll-s.players[a].roll||a-b);
  const pool=BIOMES.flatMap((_,biome)=>Array.from({length:10},(_,i)=>({tileId:`${biome}-${i}`,biome,yield:{type:i<5?'pop':'kn',amount:i<5?[1,2,4][biome]:[1,2,3][biome]}})));
- s.tiles=shuffle(s,pool).slice(0,24).map((tile,i)=>({...MAP[i],...tile,name:`${BIOMES[tile.biome]} · Space ${i+1}`,revealed:false,owner:null,city:false}));
- log(s,'24 of 30 biome tiles were shuffled across all spaces. Choose where your tribe arrives.','setup');
+ s.tiles=shuffle(s,pool).slice(0,gameMap(s).length).map((tile,i)=>({...gameMap(s)[i],...tile,name:`${BIOMES[tile.biome]} · Space ${i+1}`,revealed:false,owner:null,city:false,libraryOwners:[]}));
+ log(s,`${s.tiles.length} of 30 biome tiles were shuffled across the board. Choose where your tribe arrives.`,'setup');
  ensureAudit(s,{legacy:false,seed:seed||1});
  return s;
 }
 export const auditState=s=>snapshot(s,income);
 export function ensureAudit(s,options={legacy:true}){
- if(!s.audit)initializeAudit(s,auditState(s),{rulesRevision:RULES_REVISION,leaders:LEADERS,technologies:TECHS,cards:CARDS,assumptions:['24 randomly selected from a pooled 30 tiles, shuffled across all spaces. Pool provisionally has ten per biome, five population and five knowledge each.','Beach yields 1; mangrove 2; caldera 4 population or 3 knowledge.','Base combat D6 + D4; Archery and Shields upgrade the relevant roll to 2D6 per Brett’s clarification.','Population commitments are public, adjustable in steps of 2, and finalized when both sides confirm. Any change resets both confirmations; committed population is spent at resolution, including Guardian Turtle battles.','Nomad opens coastal routes for 1 action. Boat numbers are not applied.','Spirit deck: six of each of six card types; discards are reshuffled when empty.','Kn Tree - Current (5).png is the technology source, with the explicit dice override; Armor proposal withdrawn.','Kingmaker: capture cities during their holding period at two distinct board locations; Science: hold 40 knowledge, both immediate.','Cunning Fox learns an eligible rival technology for free without removing it or its benefits from the rival. Normal learning effects apply once to the recipient; already-owned technologies cannot be copied.']},options);
+ if(!s.audit)initializeAudit(s,auditState(s),{rulesRevision:RULES_REVISION,leaders:LEADERS,technologies:availableTechs(s),cards:CARDS,assumptions:[`${s.tiles.length} tiles selected from a 30-tile pool: ten per biome, five population and five knowledge each. Four-player games use the full pool.`,'Beach yields 1; mangrove 2; caldera 4 population or 3 knowledge.','Base combat D6 + D4; Archery and Shields upgrade the relevant roll to 2D6 per Brett’s clarification.','Population commitments are public, adjustable in steps of 2, and finalized when both sides confirm. Any change resets both confirmations; committed population is spent at resolution, including Guardian Turtle battles.',`Nomad opens neighboring outer${libraryRules(s)?' and middle':''}-ring routes for 1 action. Innermost links are ordinary routes.`,'Spirit deck: six of each of six card types; discards are reshuffled when empty.','Kn Tree - Current (5).png is the technology source, with the explicit dice override; Armor proposal withdrawn.',`Kingmaker: capture pending cities at two distinct locations, immediate. Settlement victory: hold ${settlementTarget(s)} until your next turn. City research: 10 knowledge; construction: 10 population and 1 AP; defense: +${cityDefense(s)}; hold until next turn. ${libraryRules(s)?'Science: research City, then each biome library for 8 knowledge; construct on an owned matching-biome settlement with your leader present for 1 AP, no resources. Third distinct library wins immediately. Libraries permanently belong to their builder despite capture; no defense or Kingmaker credit. Each player may build a library at a previously used site.':'Science: reach 40 knowledge for immediate victory.'}`,'Cunning Fox learns an eligible rival technology for free without removing it or its benefits from the rival. Normal learning effects apply once to the recipient; already-owned technologies cannot be copied.']},options);
  return s.audit;
 }
 export function gameAudit(s){ensureAudit(s);return exportAudit(s,auditState(s));}
@@ -84,7 +92,8 @@ function auditActionDetails(s,a){
  const p=active(s),t=s.tiles[p.pos];
  if(a.type==='build')return {cost:{population:buildCost(p,t),actions:1},tile:t.name,revealedYield:t.yield,immediateHarvest:has(p,'harvest')?t.yield:null};
  if(a.type==='attack')return {tile:t.name,defender:t.owner,cost:{population:attackCost(t),actions:1},priorAttacks:p.attacks};
- if(a.type==='city')return {tile:t.name,cost:{population:10,actions:1}};
+ if(a.type==='library')return {tile:t.name,biome:t.biome,technology:LIBRARY_TECHS[t.biome],cost:{knowledge:0,population:0,actions:1},permanentOwner:p.id};
+ if(a.type==='city')return {tile:t.name,cost:{population:cityCost(t),actions:1}};
  if(a.type==='rest')return {cost:{actions:1},reward:{population:1,knowledge:1},oncePerTurn:true};
  if(a.type==='battleOffer')return {player:a.player,proposedPopulation:a.population,bonus:a.population/2,previousPopulation:s.battle.offers[a.player],chargedNow:0};
  if(a.type==='battleReady')return {player:a.player,population:s.battle.offers[a.player],turtle:!!a.turtle};
@@ -107,7 +116,7 @@ export function act(s,a){
  s.rulesRevision=RULES_REVISION;details.rulesRevision=RULES_REVISION;
  if(a.type==='card'&&a.card==='fox')details.technologyLearning={mode:'copy',sourcePlayer:a.player,technology:a.tech,sourceKeepsTechnology:true,normalLearningEffects:true,knowledgeCost:0};
  // Legacy saves start a truthful baseline before the first newly recorded action.
- if(!s.audit){initializeAudit(s,before,{leaders:LEADERS,technologies:TECHS,cards:CARDS,assumptions:['Legacy match: original setup seed and earlier actions are unavailable.']},{legacy:true});}
+ if(!s.audit){initializeAudit(s,before,{leaders:LEADERS,technologies:availableTechs(s),cards:CARDS,assumptions:['Legacy match: original setup seed and earlier actions are unavailable.']},{legacy:true});}
  const after=auditState(s),markerIndex=s.log.indexOf(marker),messages=s.log.slice(0,markerIndex<0?s.log.length:markerIndex).map(e=>e.text).reverse();
  if(a.type==='resolve')details.result=structuredClone(s.result);
  if(a.botPolicy)details.botPolicy=a.botPolicy;
@@ -123,11 +132,11 @@ export function act(s,a){
 function win(s,p,type){s.phase='won';s.winner=p.id;s.victory=type;log(s,`${leader(p).name} wins a ${type} victory!`,'victory');}
 function checkImmediateVictory(s){
  if(s.phase!=='playing')return;
- const p=s.players.find(p=>p.kn>=40||p.preventedCities.length>=2);if(!p)return;
+ const p=s.players.find(p=>p.preventedCities.length>=2||(libraryRules(s)?p.libraries.length===3:p.kn>=40));if(!p)return;
  const before=auditState(s);win(s,p,p.preventedCities.length>=2?'Kingmaker':'Science');
- recordAudit(s,{type:'victory',actor:p.id,before,after:auditState(s),description:s.log[0].text,details:{winner:p.id,victory:s.victory,knowledge:p.kn,preventedCities:[...p.preventedCities]}});
+ recordAudit(s,{type:'victory',actor:p.id,before,after:auditState(s),description:s.log[0].text,details:{winner:p.id,victory:s.victory,knowledge:p.kn,preventedCities:[...p.preventedCities],libraries:structuredClone(p.libraries)}});
 }
-function syncClaims(s){for(const p of s.players){const tiles=owned(s,p);p.claim.settler=tiles.length>=6?(p.claim.settler??s.turn):null;const cityIds=tiles.filter(t=>t.city).map(t=>t.id);for(const id of Object.keys(p.claim.cities))if(!cityIds.includes(Number(id)))delete p.claim.cities[id];for(const id of cityIds)p.claim.cities[id]??=s.turn;}}
+function syncClaims(s){for(const p of s.players){const tiles=owned(s,p);p.claim.settler=tiles.length>=settlementTarget(s)?(p.claim.settler??s.turn):null;const cityIds=tiles.filter(t=>t.city).map(t=>t.id);for(const id of Object.keys(p.claim.cities))if(!cityIds.includes(Number(id)))delete p.claim.cities[id];for(const id of cityIds)p.claim.cities[id]??=s.turn;}}
 function beginTurn(s){
  const p=active(s);syncClaims(s);
  const victory=p.claim.settler!==null&&p.claim.settler<s.turn?'Settler':Object.values(p.claim.cities).some(v=>v<s.turn)?'City':null;
@@ -135,8 +144,8 @@ function beginTurn(s){
  p.turns++;p.ap=2+(has(p,'stamina')?1:0);p.attacks=0;p.rested=false;p.played=0;p.warcry=false;p.visited=[p.pos];const y=income(s,p);p.pop+=y.pop;p.kn+=y.kn;
  log(s,`${leader(p).name} collects ${y.pop} population and ${y.kn} knowledge.`,'income');
 }
-export function canResearch(p,id){const t=TECHS.find(t=>t.id===id);return !!t&&!has(p,id)&&p.kn>=t.cost&&(!t.parents.length||t.parents.some(id=>has(p,id)));}
-export function copyableTechnologies(s,p){return s.players.filter(q=>q.id!==p.id).flatMap(q=>q.techs.filter(id=>{const t=TECHS.find(t=>t.id===id);return !has(p,id)&&(!t.parents.length||t.parents.some(id=>has(p,id)));}).map(id=>({player:q.id,tech:id})));}
+export function canResearch(p,id){const t=TECHS.find(t=>t.id===id);return !!t&&(!LIBRARY_TECHS.includes(id)||p.libraryRules)&&!has(p,id)&&p.kn>=t.cost&&(!t.parents.length||t.parents.some(id=>has(p,id)));}
+export function copyableTechnologies(s,p){return s.players.filter(q=>q.id!==p.id).flatMap(q=>q.techs.filter(id=>{const t=TECHS.find(t=>t.id===id);return t&&(!LIBRARY_TECHS.includes(id)||p.libraryRules)&&!has(p,id)&&(!t.parents.length||t.parents.some(id=>has(p,id)));}).map(id=>({player:q.id,tech:id})));}
 // Compatibility for archived bot policies; current UI and AI use the copy name.
 export const stealable=copyableTechnologies;
 function grantTech(s,p,id){p.techs.push(id);if(id==='stamina')p.ap++;if(id==='growth')p.pop+=5;if(id==='offering')draw(s,p);if(id==='wayfinder')p.teleports++;if(id==='tribute')p.tribute=true;if(id==='warcry')p.warcry=true;}
@@ -149,7 +158,7 @@ function attack(s,p,t,free=false){
 }
 export function combatSources(s,b=s.battle){
  const a=s.players[b.attacker],d=s.players[b.defender],t=s.tiles[b.tile];
- return {attack:{hunter:has(a,'hunter')?1:0,ferocity:has(a,'ferocity')?2:0,warTribe:has(a,'wartribe')?2:0,warCry:a.warcry?3:0,population:b.offers[a.id]/2},defense:{biome:t.biome+1,gatherer:has(d,'gatherer')?1:0,warTribe:has(d,'wartribe')?2:0,leaderPresent:d.pos===t.id?1:0,city:t.city?1:0,population:b.offers[d.id]/2}};
+ return {attack:{hunter:has(a,'hunter')?1:0,ferocity:has(a,'ferocity')?2:0,warTribe:has(a,'wartribe')?2:0,warCry:a.warcry?3:0,population:b.offers[a.id]/2},defense:{biome:t.biome+1,gatherer:has(d,'gatherer')?1:0,warTribe:has(d,'wartribe')?2:0,leaderPresent:d.pos===t.id?1:0,city:t.city?cityDefense(s):0,population:b.offers[d.id]/2}};
 }
 export function combatBonuses(s,b=s.battle){return Object.fromEntries(Object.entries(combatSources(s,b)).map(([side,sources])=>[side,Object.values(sources).reduce((sum,n)=>sum+n,0)]));}
 function battleOffer(s,a){
@@ -196,7 +205,8 @@ function applyAction(s,a){
  case 'move':if(p.ap<1||!neighbors(s,p).includes(a.tile))return fail('Move along a highlighted trail for 1 action.');p.ap--;p.pos=a.tile;p.visited.push(a.tile);log(s,`${leader(p).name} travels to ${s.tiles[a.tile].name}.`);break;
  case 'build':if(p.ap<1||t.owner!==null||p.pop<buildCost(p,t))return fail('You need an empty tile, 1 action, and enough population.');p.pop-=buildCost(p,t);p.ap--;t.owner=p.id;t.revealed=true;if(has(p,'harvest'))p[t.yield.type]+=t.yield.amount;log(s,`${leader(p).name} founds a settlement at ${t.name}: +${t.yield.amount} ${t.yield.type==='pop'?'population':'knowledge'} each turn.`,'build');break;
  case 'attack':return attack(s,p,t);
- case 'city':if(p.ap<1||t.owner!==p.id||t.city||!has(p,'city')||p.pop<10||owned(s,p).filter(t=>t.city).length>=2)return fail('City requires your settlement, City technology, 10 population and 1 action.');p.ap--;p.pop-=10;t.city=true;log(s,`${leader(p).name} establishes a city! Hold it until the next turn to win.`,'victory');break;
+ case 'library':if(!libraryRules(s)||p.ap<1||t.owner!==p.id||!has(p,'city')||!has(p,LIBRARY_TECHS[t.biome])||libraryBuilt(p,t.biome))return fail('Research City and this biome library, then spend 1 AP on your settlement. Only one library per biome per player.');p.ap--;p.libraries.push({biome:t.biome,tile:t.id,turn:s.turn});t.libraryOwners.push(p.id);log(s,`${leader(p).name} completes a permanent ${BIOMES[t.biome]} library (${p.libraries.length}/3).`,'library');break;
+ case 'city':if(p.ap<1||t.owner!==p.id||t.city||!has(p,'city')||p.pop<cityCost(t)||owned(s,p).filter(t=>t.city).length>=2)return fail(`City requires your settlement, City technology, ${cityCost(t)} population and 1 action.`);p.ap--;p.pop-=cityCost(t);t.city=true;log(s,`${leader(p).name} establishes a city! Hold it until the next turn to win.`,'victory');break;
  case 'rest':if(p.ap<1||p.rested)return fail(p.rested?'You have already rested this turn.':'No actions remaining.');p.ap--;p.rested=true;p.pop++;p.kn++;log(s,`${leader(p).name} rests: +1 population, +1 knowledge.`);break;
  case 'research':if(!canResearch(p,a.tech))return fail('This technology requires more knowledge or a prerequisite.');p.kn-=TECHS.find(t=>t.id===a.tech).cost;grantTech(s,p,a.tech);log(s,`${leader(p).name} unlocks ${TECHS.find(t=>t.id===a.tech).name}.`,'research');break;
  case 'teleport':if(!p.teleports||!s.tiles[a.tile])return fail('No Wayfinder journey available.');p.teleports--;p.pos=a.tile;p.visited.push(a.tile);log(s,`${leader(p).name} uses Wayfinder to reach ${s.tiles[a.tile].name}.`);break;
@@ -221,7 +231,7 @@ export function route(s,p,target){const queue=[[p.pos]],seen=new Set([p.pos]);wh
 
 // Hard bots evaluate public state and their own hand. They never sample the game
 // RNG to plan, inspect opponents' cards, or read an unrevealed tile's yield.
-export const HARD_BOT_VERSION='leader-playstyles-2026-10-09';
+export const HARD_BOT_VERSION='leader-playstyles-libraries-2026-11-11';
 // Preferences learned from Brett's six leader playtests, not scripted move replays.
 const HARD_STYLES={
  ku:{raid:1.35,city:.75,pop:1,kn:1,opening:['spoils','ferocity'],research:['spiritual','favor','archery','nomad','stamina','growth','wartribe']},
@@ -242,13 +252,18 @@ function attackOdds(a,d,attack,defense){
  const odds=wins/total;oddsCache.set(key,odds);return odds;
 }
 function publicBattle(s,p,t){return {attacker:p.id,defender:t.owner,tile:t.id,offers:{[p.id]:0,[t.owner]:0}};}
-function urgentTile(s,t){return t.city||s.players[t.owner]?.claim.settler!==null&&t.owner!==null;}
+function libraryThreat(s,t){
+ const q=s.players[t.owner];if(!libraryRules(s)||!q||q.libraries.length!==2||libraryBuilt(q,t.biome)||!has(q,'city'))return false;
+ if(!has(q,LIBRARY_TECHS[t.biome])&&q.kn+income(s,q).kn<8)return false;
+ return q.teleports>0||route(s,q,t.id).length-1+1<=2+(has(q,'stamina')?1:0);
+}
+function urgentTile(s,t){return t.city||libraryThreat(s,t)||s.players[t.owner]?.claim.settler!==null&&t.owner!==null;}
 function hardBattleAction(s,id){
  const b=s.battle,p=s.players[id],defending=id===b.defender,t=s.tiles[b.tile];
  if(b.ready[id])return null;
  const a=s.players[b.attacker],d=s.players[b.defender],mods=combatBonuses(s);
  if(defending&&p.cards.includes('turtle'))return {type:'battleReady',player:id,turtle:true};
- const critical=urgentTile(s,t)||owned(s,a).length>=5;
+ const critical=urgentTile(s,t)||owned(s,a).length>=settlementTarget(s)-1||(a.libraries.length===2&&!libraryBuilt(a,t.biome)&&libraryReady(a,t.biome)&&a.ap>=1);
  const reserve=battleReserve(s,p,critical);
  const max=Math.max(b.offers[id],Math.floor(Math.max(0,p.pop-reserve)/2)*2);
  const value=critical?1000:12+t.biome*3+(t.revealed?t.yield.amount*2:0);
@@ -322,12 +337,13 @@ function hardAction(s){
  if(s.phase!=='playing')return null;
  const y=income(s,p),enemies=s.tiles.filter(t=>t.owner!==null&&t.owner!==p.id);
  const threats=enemies.filter(t=>urgentTile(s,t));
- const pending=mine.some(t=>t.city)||mine.length>=6;
- const science=p.kn>=30&&p.kn+y.kn*2>=40;
- const savingForCity=has(p,'city')&&mine.length>0&&!pending&&p.pop<10&&p.pop+y.pop+1>=10;
- if(card('owl')&&(p.kn>=36||!threats.length))return {type:'card',card:'owl'};
+ const pending=mine.some(t=>t.city)||mine.length>=settlementTarget(s);
+ const science=libraryRules(s)?!pending&&has(p,'city')&&p.kn>=5&&p.kn+y.kn>=8&&mine.some(t=>!libraryBuilt(p,t.biome)&&!has(p,LIBRARY_TECHS[t.biome])):p.kn>=30&&p.kn+y.kn*2>=40;
+ const cheapestCity=Math.min(...mine.filter(t=>!t.city).map(cityCost));
+ const savingForCity=has(p,'city')&&!pending&&p.pop<cheapestCity&&p.pop+y.pop+1>=cheapestCity;
+ if(card('owl')&&!threats.length)return {type:'card',card:'owl'};
  if(p.tribute&&mine.length)return {type:'tribute',tiles:[...mine].sort((a,b)=>(b.yield.type==='kn'&&science?4:1)*b.yield.amount-(a.yield.type==='kn'&&science?4:1)*a.yield.amount).slice(0,2).map(t=>t.id)};
- if(p.ap>0&&!p.rested&&p.kn===39)return {type:'rest'};
+ 
  const interception=interceptClaim(s,p,threats,card);if(interception)return interception;
  // Extra mobility may turn an otherwise unreachable claim into an attack now.
  if(threats.length){
@@ -342,18 +358,24 @@ function hardAction(s){
   let score=-Infinity,action=null;
   const revealed=t.revealed?t.yield.amount*(t.yield.type==='pop'?style.pop:style.kn):([1,2,3.5][t.biome])*(style.pop+style.kn)/2;
   if(t.owner===null&&p.pop>=buildCost(p,t)&&!pending&&!savingForCity){
-   score=27+revealed*2-buildCost(p,t)*.9+(mine.length===5?70:0)+(mine.length<2?10:0);
+   score=27+revealed*2-buildCost(p,t)*.9+(mine.length===settlementTarget(s)-1?70:0)+(mine.length<2?10:0);
    if(science)score-=14;
+   if(libraryRules(s)&&has(p,'city')&&!libraryBuilt(p,t.biome)&&!mine.some(g=>g.biome===t.biome))score+=p.libraries.length===2?140:18+15*p.libraries.length;
    action='build';
   }
-  if(t.owner===p.id&&!t.city&&has(p,'city')&&p.pop>=10&&!pending){
+  if(t.owner===p.id&&!t.city&&has(p,'city')&&p.pop>=cityCost(t)&&!pending){
    const exposure=s.players.filter(q=>q.id!==p.id).reduce((sum,q)=>sum+(route(s,q,t.id).length<=3?8:0),0);
-   score=100*style.city+t.biome*3-exposure-Math.max(0,4-(p.pop-10))*exposure/4;action='city';
+   score=100*style.city+t.biome*3-exposure-Math.max(0,4-(p.pop-cityCost(t)))*exposure/4;action='city';
   }
-  if(t.owner===p.id&&!t.city&&savingForCity){score=60+t.biome*3;action='prepareCity';}
+  if(t.owner===p.id&&!libraryBuilt(p,t.biome)&&libraryReady(p,t.biome)&&(!pending||p.libraries.length===2)){
+   const libraryScore=p.libraries.length===2?600:55+25*p.libraries.length;
+   if(libraryScore>score){score=libraryScore;action='library';}
+  }
+  if(t.owner===p.id&&!t.city&&savingForCity&&p.pop+y.pop+1>=cityCost(t)&&action!=='library'){score=60+t.biome*3;action='prepareCity';}
   if(t.owner!==null&&t.owner!==p.id){
-   const urgent=urgentTile(s,t),estimate=raidEstimate(s,p,t,urgent||mine.length>=5),chance=estimate.chance;
-   score=estimate.value+(mine.length===5?70*chance:0);
+   const urgent=urgentTile(s,t),estimate=raidEstimate(s,p,t,urgent||mine.length>=settlementTarget(s)-1),chance=estimate.chance;
+   score=estimate.value+(mine.length===settlementTarget(s)-1?70*chance:0);
+   if(libraryRules(s)&&has(p,'city')&&!libraryBuilt(p,t.biome)&&!mine.some(g=>g.biome===t.biome))score+=(p.libraries.length===2?200:18+15*p.libraries.length)*chance;
    // A claim we cannot attack this turn must not lure us into futile travel.
    if(urgent)score=-Infinity;
    if(t.city&&p.preventedCities.length===1&&!p.preventedCities.includes(t.id))score+=500*chance;
@@ -372,12 +394,17 @@ function hardAction(s){
  if(card('fox')){
   const goal=[...style.opening,...style.research].find(id=>!has(p,id));
   const path=cityResearchPath(p,goal||'city').ids;
-  const options=copyableTechnologies(s,p).map(o=>({...o,value:TECHS.find(t=>t.id===o.tech).cost+(path.includes(o.tech)?12:0)+(['stamina','wisdom','tent'].includes(o.tech)?5:0)})).sort((a,b)=>b.value-a.value);
+  const options=copyableTechnologies(s,p).map(o=>({...o,value:TECHS.find(t=>t.id===o.tech).cost+(path.includes(o.tech)?12:0)+(LIBRARY_TECHS.includes(o.tech)&&!libraryBuilt(p,LIBRARY_TECHS.indexOf(o.tech))&&mine.some(t=>t.biome===LIBRARY_TECHS.indexOf(o.tech))?12+10*p.libraries.length:0)+(['stamina','wisdom','tent'].includes(o.tech)?5:0)})).sort((a,b)=>b.value-a.value);
   if(options.length)return {type:'card',card:'fox',player:options[0].player,tech:options[0].tech};
  }
  if(card('owl'))return {type:'card',card:'owl'};
+ if(best?.action==='library'&&p.ap>0){
+  const tech=LIBRARY_TECHS[best.t.biome];
+  if(!has(p,tech))return {type:'research',tech};
+  if(best.distance===0)return {type:'library'};
+ }
  if(best?.action==='city'&&best.distance===0&&p.ap>0)return {type:'city'};
- if(!science&&!pending){
+ if(!science&&!pending&&best?.action!=='library'){
   if(canResearch(p,'growth'))return {type:'research',tech:'growth'};
   const raiding=best?.action==='attack'&&best.score>20&&best.distance+1<=p.ap;
   if(raiding){
@@ -385,7 +412,7 @@ function hardAction(s){
    const upgrade=['hunter','spoils','ferocity','archery','wartribe'].find(id=>canResearch(p,id));
    if(upgrade)return {type:'research',tech:upgrade};
   }
-  if(canResearch(p,'city')&&mine.length&&(p.leader==='asinya'||p.turns>=6)&&p.pop>=10)return {type:'research',tech:'city'};
+  if(canResearch(p,'city')&&mine.length&&(p.leader==='asinya'||p.turns>=6)&&mine.some(t=>!t.city&&p.pop>=cityCost(t)))return {type:'research',tech:'city'};
   const next=leaderResearch(p);
   if(next&&canResearch(p,next))return {type:'research',tech:next};
   if(!next&&canResearch(p,'city')&&mine.length)return {type:'research',tech:'city'};
@@ -399,7 +426,7 @@ function hardAction(s){
  }
  if(best?.score>0&&best.action!=='guard'){
   if(best.action==='attack'&&card('tiger')&&(best.distance>0||p.ap===0))return {type:'card',card:'tiger',tile:best.t.id};
-  const decisive=best.action==='city'||mine.length===5;
+  const decisive=best.action==='city'||(best.action==='library'&&p.libraries.length===2)||mine.length===settlementTarget(s)-1;
   if(best.distance>1&&p.ap>0&&p.teleports&&(decisive||p.leader!=='hecatl'&&best.action==='attack'))return {type:'teleport',tile:best.t.id};
   if(best.distance>1&&p.ap>0&&card('eagle')&&(decisive||best.action==='attack'))return {type:'card',card:'eagle',tile:best.t.id};
   if(p.ap>0){
@@ -414,6 +441,7 @@ function hardAction(s){
  return {type:'end'};
 }
 export function aiBattleAction(s,id){
+ if(!libraryRules(s))return classicBattleAI(s,id);
  if(s.difficulty==='hard')return hardBattleAction(s,id);
  const b=s.battle,p=s.players[id],defending=id===b.defender;
  if(b.ready[id])return null;
@@ -426,6 +454,7 @@ export function aiBattleAction(s,id){
  return {type:'battleReady',player:id};
 }
 export function aiAction(s){
+ if(!libraryRules(s))return classicAI(s);
  if(s.difficulty==='hard')return hardAction(s);
  const p=active(s),l=leader(p);
  if(s.phase==='draft'){
@@ -441,11 +470,12 @@ export function aiAction(s){
  if(canCard&&p.cards.includes('jaguar')&&p.ap===0)return {type:'card',card:'jaguar'};
  if(canCard&&p.cards.includes('fox')){const candidates=copyableTechnologies(s,p).sort((a,b)=>TECHS.find(t=>t.id===b.tech).cost-TECHS.find(t=>t.id===a.tech).cost);if(candidates.length)return {type:'card',card:'fox',...candidates[0]};}
  if(p.tribute&&mine.length)return {type:'tribute',tiles:[...mine].sort((a,b)=>b.yield.amount-a.yield.amount).slice(0,2).map(t=>t.id)};
- if(p.ap>0&&has(p,'city')&&t.owner===p.id&&!t.city&&p.pop>=10)return {type:'city'};
+ if(p.ap>0&&t.owner===p.id&&!libraryBuilt(p,t.biome)&&libraryReady(p,t.biome))return has(p,LIBRARY_TECHS[t.biome])?{type:'library'}:{type:'research',tech:LIBRARY_TECHS[t.biome]};
+ if(p.ap>0&&has(p,'city')&&t.owner===p.id&&!t.city&&p.pop>=cityCost(t))return {type:'city'};
  const priorities=l.style==='Conqueror'?['hunter','spoils','ferocity','city','archery','wartribe']:l.style==='Explorer'?['nomad','stamina','tent','city','rally']:l.style==='Scholar'?['spiritual','growth','wisdom','city','shields']:['gatherer','harvest','fertility','city','wartribe'];
  // Easy opponents invest less consistently. Every difficulty obeys the same economy and hidden information.
  const planned=priorities.find(id=>!has(p,id));
- if(p.kn<30&&planned&&canResearch(p,planned)&&(s.difficulty!=='easy'||random(s)>.45))return {type:'research',tech:planned};
+ if((libraryRules(s)||p.kn<30)&&planned&&canResearch(p,planned)&&(s.difficulty!=='easy'||random(s)>.45))return {type:'research',tech:planned};
  if(p.ap===0){if(p.pop>=10+spiritCardCost(p)&&p.cards.length<3&&s.deck.length)return {type:'buyCard'};return {type:'end'};}
  if(t.owner!==null&&t.owner!==p.id&&p.pop>=attackCost(t)&&(p.attacks<2||imminent.some(e=>e.id===t.id)))return {type:'attack'};
  if(t.owner===null&&p.pop>=buildCost(p,t))return {type:'build'};
@@ -454,7 +484,8 @@ export function aiAction(s){
   let value=-100;
   if(g.owner===null&&p.pop>=buildCost(p,g))value=8+g.biome*1.5-distance*2;
   if(g.owner!==null&&g.owner!==p.id&&p.pop>=attackCost(g))value=(l.style==='Conqueror'?9:5)+(g.city?24:0)+(s.players[g.owner].claim.settler!==null?16:0)-distance*2;
-  if(g.owner===p.id&&!g.city&&has(p,'city')&&p.pop>=10)value=30-distance*2;
+  if(g.owner===p.id&&!g.city&&has(p,'city')&&p.pop>=cityCost(g))value=30-distance*2;
+  if(g.owner===p.id&&!libraryBuilt(p,g.biome)&&libraryReady(p,g.biome))value=Math.max(value,40+15*p.libraries.length-distance*2);
   // Revealed yields only; never consult a hidden yield when planning.
   if(g.revealed&&g.owner!==p.id)value+=g.yield.amount*.4;
   if(p.visited.includes(g.id))value-=4;

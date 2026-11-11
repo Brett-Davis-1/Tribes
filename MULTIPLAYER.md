@@ -1,6 +1,6 @@
 # Private-room multiplayer — local edition
 
-Implemented October 12, 2026. Uses the approved `2.3-leaders-2026-10-12` rules with all four victories, including Science at 40 knowledge.
+Implemented October 12, 2026; updated November 11, 2026 to `3.0-libraries-player-count-2026-11-11`. All four victories remain enabled. Science requires three permanent biome libraries in three- and four-player games; two-player games retain Science at 40 knowledge. The rules, map size and settlement target follow the final seat count, including bots. See RULES.md section 19.
 
 ## Try it on this computer
 

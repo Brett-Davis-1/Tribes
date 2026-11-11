@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createGame,act,active,owned,income,aiAction,MAP,neighbors,LEADERS,TECHS,combatBonuses,buildCost,diceSides} from './engine.mjs';
-import {gameAudit,auditState,ensureAudit,aiBattleAction,HARD_BOT_VERSION,RULES_REVISION,spiritCardCost} from './engine.mjs';
+import {gameAudit,auditState,ensureAudit,aiBattleAction,HARD_BOT_VERSION,RULES_REVISION,spiritCardCost,availableTechs} from './engine.mjs';
 import {auditCSV,auditHTML} from './audit.mjs';
 function ready(seed=123){const s=createGame({human:'asinya',opponents:1,seed});while(s.phase==='draft')assert.ok(act(s,{type:'place',tile:active(s).id*4}).ok);s.turnIndex=s.order.indexOf(0);s.tiles[0].biome=0;return s;}
 function success(s,a){if(a.type==='resolve'&&s.phase==='battle'){const b=s.battle;for(const id of [b.attacker,b.defender])if(!b.ready[id])assert.ok(act(s,{type:'battleReady',player:id,turtle:id===b.defender&&!!a.turtle}).ok);}const result=act(s,a);assert.ok(result.ok,result.message);return result;}
@@ -138,7 +138,7 @@ test('Fox learns for free, requires prerequisites, and cannot repeat an owned re
  const after=JSON.stringify(s);assert.equal(act(s,{type:'card',card:'fox',player:1,tech:'growth'}).ok,false);assert.equal(JSON.stringify(s),after);
 });
 test('Fox preserves the source player for every technology and grants normal learning effects',()=>{
- for(const t of TECHS){
+ for(const t of availableTechs(ready())){
   const s=ready(),p=active(s),d=s.players[1];p.ap=2;p.kn=0;p.pop=20;p.techs=t.parents.length?[t.parents[0]]:[];p.cards=['fox'];p.teleports=0;p.tribute=false;p.warcry=false;
   d.techs=TECHS.map(t=>t.id);d.ap=3;d.teleports=1;d.tribute=true;d.warcry=true;
   const source=structuredClone(d),deckCount=s.deck.length;
@@ -202,9 +202,9 @@ test('HTML and CSV exports escape untrusted text safely',()=>{
  const s=createGame({seed:17}),r=gameAudit(s);r.events[0].description='=HYPERLINK("bad")\n<script>alert(1)</script>';const csv=auditCSV(r),html=auditHTML(r);assert.ok(csv.includes("'=HYPERLINK"));assert.ok(csv.includes('""bad""'));assert.ok(!html.includes('<script>alert(1)</script>'));assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
 });
 
-test('latest supplied tree has all 22 costs and incoming arrows; Armor is absent',()=>{
+test('latest supplied tree has all 25 costs and incoming arrows; Armor is absent',()=>{
  const expected=[['nomad',5,[]],['stamina',2,['nomad']],['wayfinder',1,['nomad']],['tent',5,['stamina','wayfinder']],['rally',2,['tent']],['tribute',2,['tent','wisdom']],['spiritual',5,[]],['growth',1,['spiritual']],['favor',3,['spiritual']],['wisdom',5,['growth','favor']],['shields',7,['wisdom','fertility']],['gatherer',5,[]],['harvest',2,['gatherer']],['offering',1,['gatherer']],['fertility',5,['harvest','offering']],['wartribe',8,['fertility','ferocity']],['hunter',5,[]],['spoils',2,['hunter']],['warcry',2,['hunter']],['ferocity',5,['spoils','warcry']],['archery',7,['ferocity']],['city',10,['tent','wisdom','fertility','ferocity']]];
- assert.deepEqual(TECHS.map(t=>[t.id,t.cost,t.parents]),expected);assert.ok(!TECHS.some(t=>t.id==='armor'));
+ assert.deepEqual(TECHS.map(t=>[t.id,t.cost,t.parents]),[...expected,...['beachLibrary','mangroveLibrary','calderaLibrary'].map(id=>[id,8,['city']])]);assert.ok(!TECHS.some(t=>t.id==='armor'));
  for(const l of LEADERS){const s=createGame({human:l.id});assert.equal(s.players[0].pop,l.id==='asinya'?18:10);assert.equal(s.players[0].kn,l.id==='tao'?3:5);}
 });
 
@@ -269,8 +269,8 @@ test('Turtle spends confirmed commitments and Rallying Cry is the only defensive
  success(s,{type:'resolve',turtle:true});assert.equal(p.pop,6);assert.equal(d.pop,11);assert.equal(s.result.defensiveReward,3);assert.deepEqual(s.result.ar,[]);
 });
 
-test('an earlier-rules save is rejected without mutation and new audits identify rules edition 2',()=>{
- const s=ready();assert.equal(s.audit.ruleset,'tribes-rules-2');s.version=1;const before=JSON.stringify(s);assert.equal(act(s,{type:'rest'}).ok,false);assert.equal(JSON.stringify(s),before);
+test('an earlier-rules save is rejected without mutation and new audits identify rules edition 3',()=>{
+ const s=ready();assert.equal(s.audit.ruleset,'tribes-rules-3');s.version=1;const before=JSON.stringify(s);assert.equal(act(s,{type:'rest'}).ok,false);assert.equal(JSON.stringify(s),before);
 });
 
 

@@ -83,17 +83,17 @@ export class RoomService {
   const battleActions=['battleOffer','battleReady'];
   if(game.phase==='battle')requireThat(battleActions.includes(a.type)&&[game.battle.attacker,game.battle.defender].includes(id),'Only the battling players may respond.',403);
   else requireThat(active(game).id===id,'Wait for your turn.',403);
-  const fields={place:['tile'],move:['tile'],build:[],attack:[],city:[],rest:[],end:[],buyCard:[],research:['tech'],teleport:['tile'],tribute:['tiles'],card:['card','tile','player','tech'],battleOffer:['player','population'],battleReady:['player','turtle']};
+  const fields={place:['tile'],move:['tile'],build:[],attack:[],city:[],library:[],rest:[],end:[],buyCard:[],research:['tech'],teleport:['tile'],tribute:['tiles'],card:['card','tile','player','tech'],battleOffer:['player','population'],battleReady:['player','turtle']};
   requireThat(Object.hasOwn(fields,a.type),'Unknown action.');
   requireThat(Object.keys(a).every(k=>k==='type'||fields[a.type].includes(k)),'Unexpected action fields.');
   requireThat(game.phase!=='draft'||a.type==='place','Choose your landing first.');
   requireThat(game.phase!=='playing'||!battleActions.includes(a.type),'There is no battle to confirm.');
   const clean={type:a.type};for(const field of fields[a.type])if(a[field]!==undefined)clean[field]=a[field];
-  if(['place','move','teleport'].includes(a.type)||('tile' in clean))requireThat(Number.isInteger(a.tile)&&a.tile>=0&&a.tile<24,'Choose a valid tile.');
+  if(['place','move','teleport'].includes(a.type)||('tile' in clean))requireThat(Number.isInteger(a.tile)&&a.tile>=0&&a.tile<game.tiles.length,'Choose a valid tile.');
   if(a.type==='research'||'tech' in clean)requireThat(TECHS.some(t=>t.id===a.tech),'Choose a valid technology.');
   if(a.type==='card')requireThat(Object.hasOwn(CARDS,a.card),'Choose a valid spirit card.');
   if('player' in clean)requireThat(Number.isInteger(a.player)&&a.player>=0&&a.player<game.players.length,'Choose a valid player.');
-  if(a.type==='tribute')requireThat(Array.isArray(a.tiles)&&a.tiles.length>=1&&a.tiles.length<=2&&a.tiles.every(t=>Number.isInteger(t)&&t>=0&&t<24),'Choose one or two settlement tiles.');
+  if(a.type==='tribute')requireThat(Array.isArray(a.tiles)&&a.tiles.length>=1&&a.tiles.length<=2&&a.tiles.every(t=>Number.isInteger(t)&&t>=0&&t<game.tiles.length),'Choose one or two settlement tiles.');
   if(battleActions.includes(a.type)){requireThat(a.player===undefined||a.player===id,'You may only commit your own population.',403);clean.player=id;}
   if(a.type==='battleOffer')requireThat(Number.isInteger(a.population)&&a.population>=0&&a.population<=game.players[id].pop&&a.population%2===0,'Commit affordable population in steps of two.');
   if('turtle' in clean)requireThat(typeof a.turtle==='boolean','Invalid Guardian Turtle choice.');

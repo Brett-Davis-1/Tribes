@@ -2,6 +2,12 @@
 
 A local strategy game using Brett's original board and card artwork. Play single-player against bots, or create a private multiplayer room for 2–4 seats with optional hard bots.
 
+## Rules edition 3 — November 11, 2026
+
+Three- and four-player games use permanent Beach, Mangrove and Caldera libraries for Science victory, +2 city defense, and Nomad routes on the outer and middle rings. Each library requires City research, its own 8-knowledge research, and construction for 1 AP at an owned matching-biome settlement with the leader present. The third library wins immediately. Captures never remove or transfer library credit.
+
+Four-player games use all 30 tiles and require holding five settlements; three-player games retain 24 tiles and six settlements. Two-player rules are unchanged. City construction remains **10 population + 1 AP** for every player count. Start a new match or room; earlier-rules single-player saves remain available for audit export. See RULES.md section 19 for the complete comparison.
+
 ## Private multiplayer
 
 Open **http://127.0.0.1:4178/?multiplayer=1** after starting the server. Create a room, share its invite with another browser or private window on this computer, choose distinct leaders, mark everyone ready, and start. The host can add hard bots. See **MULTIPLAYER.md** for the complete testing, reconnect, storage and hosting instructions.
@@ -21,7 +27,7 @@ The game can be restarted using `Start Tribes.cmd` on Windows. Leave the server 
 ## Implemented
 
 - All six supplied leaders and their starting conditions.
-- Original 24-location island, with 24 of 30 biome tiles shuffled across all locations.
+- Original 24-location island for two or three players; a 30-location island with ten tiles of each biome for four players.
 - Movement, building, resting, attacking, settlement income, public population commitments, biome defense, city upgrades, held Settlement/City victories and immediate Science/Kingmaker victories.
 - The supplied Kn Tree - Current (5).png knowledge tree, with confirmed 2D6 Archery/Shields upgrades, including free actions, teleportation, immediate yields, defensive/offensive upgrades and one-time rewards.
 - Six spirit card types, including free technology learning from rivals and Guardian Turtle's defensive response window.
@@ -38,11 +44,11 @@ The game can be restarted using `Start Tribes.cmd` on Windows. Leave the server 
 
 ## Provisional rules to confirm
 
-The user confirmed random selection of 24 from 30 tiles and requested omission of King Slayer. The following other details remain assumptions and are disclosed in **How to play**:
+Two- and three-player games select 24 of 30 tiles; four-player games use the full pool. King Slayer is omitted. The following details include assumptions and confirmed clarifications disclosed in **How to play**:
 
 - Each environment's ten tiles contain five population and five knowledge tiles. Beach yields 1; mangrove 2; caldera 4 population or 3 knowledge. Change the pool in `createGame` once exact quantities are supplied.
 - Base combat is D6 + D4. Archery upgrades attack to 2D6; Shields upgrades defense to 2D6. These values are confirmed.
-- Nomad permits travel along dashed coastal routes, at one action per neighboring beach. Boat numbers are not applied. Standard trails were traced from the supplied board and should be confirmed in playtesting.
+- Nomad permits travel along dashed outer-ring routes, plus middle-ring routes with three or four players, at one action per neighboring space regardless of biome. Boat numbers are not applied.
 - The 36-card spirit deck has six of each type and reshuffles its discards when empty.
 - Cunning Fox copies an eligible rival technology for free. The rival keeps the technology and all benefits; the learner receives its normal effects, including one-time rewards. Prerequisites still apply and already-owned technologies cannot be copied.
 - Stamina gives its extra action immediately. Every player rests once per own turn for 1 AP; Nomad uses that same rule.
@@ -61,7 +67,7 @@ Turn-start income is recorded separately from the preceding player's end-turn ac
 
 **Game audits** on the leader selection screen (or **Game history** in the menu) lists all recorded games, including unfinished or replaced matches. History is automatically stored in this browser's IndexedDB; downloading files provides an independent copy. Clearing browser data removes the local history. No reports are uploaded anywhere.
 
-Earlier-rules saves remain available for audit export but cannot resume under rules edition 2. Older audits retain their original ruleset; saves made before recording began remain explicitly partial. Start a new match to record every action from setup onward. Export filenames include a unique game ID and the event count. File timestamps are UTC; the history screen shows Central Time.
+Earlier-rules saves remain available for audit export but cannot resume under rules edition 3. Older audits retain their original ruleset; saves made before recording began remain explicitly partial. Start a new match to record every action from setup onward. Export filenames include a unique game ID and the event count. File timestamps are UTC; the history screen shows Central Time.
 
 ## Verification details
 

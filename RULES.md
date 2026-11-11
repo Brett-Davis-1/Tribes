@@ -1,13 +1,13 @@
 # Tribes of the Lost Island — Living Rules
 
-**Document version:** 2.3  
+**Document version:** 3.0  
 **Baseline date:** October 8, 2026 (America/Chicago)  
-**Implemented ruleset ID:** `tribes-rules-2`  
+**Implemented ruleset ID:** `tribes-rules-3`  
 **Scope:** The current playable browser game, including its computer opponents and private-room multiplayer.
 
-**Multiplayer availability:** Private rooms use the same edition-2.3 gameplay rules, leader starts, and four victories. The server controls actions and saves; each player sees only their own spirit hand. Complete multiplayer audit exports unlock after victory to avoid revealing hidden information during play. See `MULTIPLAYER.md` for room setup, reconnection, storage, and local testing. Single-player saves and in-progress audit exports retain their existing behavior.
+**Multiplayer availability:** Private rooms use the same edition-3.0 player-count rules, leader starts, and four victories. The server controls actions and saves; each player sees only their own spirit hand. Complete multiplayer audit exports unlock after victory to avoid revealing hidden information during play. See `MULTIPLAYER.md` for room setup, reconnection, storage, and local testing. Single-player saves and in-progress audit exports retain their existing behavior.
 
-**Latest update:** October 12, 2026: applied the approved leader roster. Ku has no opening AP bonus; Asinya starts with 18 population; Tao starts with 3 knowledge; Daikotei starts with two spirit cards and purchases additional cards for 3 population. Herysi and Hecatl keep their original starts. Science victory remains immediate at 40 knowledge. Revision: `2.3-leaders-2026-10-12`. Cunning Fox continues to copy technologies without removing them from the source.
+**Latest update:** November 11, 2026: three- and four-player matches gain permanent biome libraries (8 knowledge per research), middle-ring Nomad trails, and +2 city defense. Only four players use all 30 tiles and a five-settlement target. Three players retain 24 tiles and six settlements. Two-player rules are unchanged. City construction remains 10 population + 1 AP for everyone. Leader stats are unchanged. Revision: `3.0-libraries-player-count-2026-11-11`.
 
 This is our working reference for auditing and changing the video game. It describes the implementation as it exists, including assumptions and known differences from the supplied board-game materials. Documenting a behavior does not mean you have approved it as a final design decision.
 
@@ -44,21 +44,21 @@ Source materials: `Copy of Tribes Official Rules 2.0.pdf`, `Tribes board 12_24_2
 | SPIRIT-01 | Buy a random spirit card | 3 population for Daikotei; 5 for other leaders; 0 AP |
 | SPIRIT-02 | Normal spirit-play allowance | 1 card per own turn; Spiritual raises it to 2 |
 | RESEARCH-01 | Buy a technology | Listed knowledge cost; 0 AP |
-| WIN-01 | Settler victory | Hold at least 6 settlements continuously until your next turn |
+| WIN-01 | Settler victory | Hold 5 settlements with four players; 6 with two or three; until your next turn |
 | WIN-02 | City victory | Hold at least one particular city continuously until your next turn |
 | WIN-03 | King Slayer | Disabled |
 | WIN-04 | Kingmaker | Capture cities at two distinct locations during their holding period; immediate |
-| WIN-05 | Science | Reach 40 unspent knowledge; immediate |
+| WIN-05 | Science | Three/four players: complete all three permanent biome libraries; two players: reach 40 knowledge; immediate |
 
 AP means action points. Population and knowledge are separate balances; neither can pay for the other.
 
 ## 3. Players, setup and randomization
 
-**SET-01 — Player count. Adaptation.** One human and 1–3 computer tribes: 2–4 tribes total. Default setup is two computer opponents on Standard difficulty. There is no local human multiplayer or online multiplayer.
+**SET-01 — Player count. Adaptation.** One human and 1–3 computer tribes: 2–4 tribes total. Default setup is two computer opponents on Standard difficulty. Private-room online multiplayer supports two to four seats, mixing humans and bots.
 
 **SET-02 — Leader selection. Adaptation.** The human chooses any of the six leaders. Computer leaders are randomly chosen from the remaining leaders, without duplicates. Computer tribes use the same leader benefits as a human using that leader.
 
-**SET-03 — Tile selection. Confirmed total and randomized placement; provisional pool composition.** Shuffle one pool of 30 biome tiles, choose 24 without replacement and assign them across all 24 board spaces. Six tiles are unused. There is no requirement to select exactly eight of each biome. Calderas can occupy printed beach locations and vice versa. Building costs, tile yields and biome defense follow the assigned tile, not its board ring.
+**SET-03 — Tile selection. Confirmed total and randomized placement; provisional pool composition.** Shuffle one pool of 30 biome tiles. With two or three players, choose 24 without replacement for 24 spaces; six are unused and biome counts vary. With four players, use all 30 across three rings of ten: exactly ten tiles of each biome. Calderas can occupy printed beach locations and vice versa. Building costs, tile yields and biome defense follow the assigned tile, not its board ring.
 
 | Biome | Tiles in the provisional pool | Population tiles | Knowledge tiles |
 | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ AP means action points. Population and knowledge are separate balances; neither 
 | Mangrove | 10 | Five yielding +2 population | Five yielding +2 knowledge |
 | Caldera | 10 | Five yielding +4 population | Five yielding +3 knowledge |
 
-Biome identity is public, marked B / M / C on the board. A tile’s single resource yield is fixed at setup and revealed when first built. Unbuilt tiles have no income. Spaces are labeled 1–24 for identity; movement links remain fixed. The central lake is artwork, not an extra space.
+Biome identity is public, marked B / M / C on the board. A tile’s single resource yield is fixed at setup and revealed when first built. Unbuilt tiles have no income. Spaces are labeled 1–24, or 1–30 with four players, for identity; movement links remain fixed. The central lake is artwork, not an extra space.
 
 **SET-04 — Starting resources. Confirmed.** Give each tribe its leader's population, knowledge, starting technology and cards, as listed in section 4. No settlements or cities exist at setup. The normal first-turn income is added when that tribe's first turn begins.
 
@@ -74,7 +74,7 @@ Biome identity is public, marked B / M / C on the board. A tile’s single resou
 
 **SET-06 — Arrival and turn order. Source with digital tie/order choices.** Each tribe rolls one D6. Sort all tribes from highest roll to lowest; ties favor the lower player ID, with the human at ID 0. Each tribe chooses a starting space in that order. There is no reroll. Turns continue in this same fixed order throughout the game. This differs from the PDF's wording of highest roller first, then clockwise seating.
 
-**SET-07 — Starting position. Source.** A leader may start on any of the 24 spaces, including an interior space or one already occupied by another leader. Placement costs nothing and does not build a settlement. Computer tribes currently choose beaches; see section 14.
+**SET-07 — Starting position. Source.** A leader may start on any board space, including an interior space or one already occupied by another leader. Placement costs nothing and does not build a settlement. Computer tribes currently choose beaches; see section 14.
 
 **SET-08 — Random outcomes. Adaptation.** Setup, card shuffles and dice use a seeded pseudorandom sequence. Dice results range from 1 through the die's number of sides. New games receive a fresh time-derived seed. The audit records the initial seed for new games and RNG state around actions. Computer decision randomness also consumes the sequence; the initial seed alone is not a complete replay script.
 
@@ -126,11 +126,11 @@ Cities remain settlements for income calculations. A city does not multiply a ti
 
 **MOVE-02 — Shared spaces.** Any number of leaders may occupy the same space. Entering a rival settlement does not automatically start combat. Moving away does not surrender your settlement or remove its income. Battles do not kill, displace or eliminate leaders.
 
-**MOVE-03 — Coastal routes. Provisional.** Owning Nomad enables the extra route between each neighboring pair of outer-ring spaces, regardless of assigned biome. Each such move costs 1 AP. These represent the dashed coastal paths. The numbers printed on boats are currently ignored; they do not restrict player counts or travel.
+**MOVE-03 — Nomad trails. Confirmed.** Nomad enables connections between neighboring outer-ring spaces. Three- and four-player games also connect neighboring middle-ring spaces. Every move costs 1 AP regardless of biome. Inner-ring connections remain ordinary paths. Boat numbers are not used.
 
-**MOVE-04 — Teleports.** Wayfinder and Soaring Eagle can reach any of the 24 spaces for no AP. Neither requires Nomad, an empty destination, or a friendly destination. Choosing the current space is allowed and still consumes the ability/card. Fighting Tiger teleports only to a rival settlement and immediately attacks it.
+**MOVE-04 — Teleports.** Wayfinder and Soaring Eagle can reach any board space for no AP. Neither requires Nomad, an empty destination, or a friendly destination. Choosing the current space is allowed and still consumes the ability/card. Fighting Tiger teleports only to a rival settlement and immediately attacks it.
 
-**MAP-01 — Exact route graph. Provisional tracing of the artwork.** Physical spaces 1–8 are the outer ring clockwise from the upper left; 9–16 are the middle ring clockwise from the top; 17–24 are the inner ring clockwise from the upper left. Assigned biomes do not change these links. All links work both ways.
+**MAP-01 — Two/three-player route graph.** Physical spaces 1–8 are the outer ring clockwise from the upper left; 9–16 are the middle ring clockwise from the top; 17–24 are the inner ring clockwise from the upper left. Assigned biomes do not change these links. All links work both ways.
 
 | Outer space | Connected middle spaces | Middle space | Connected inner spaces |
 | --- | --- | --- | --- |
@@ -143,7 +143,9 @@ Cities remain settlements for income calculations. A city does not multiply a ti
 | 7 | 15, 14 | 15 | 23, 24 |
 | 8 | 16, 15 | 16 | 24, 17 |
 
-Inner spaces also form a ring: 17–18–19–20–21–22–23–24–17. With Nomad, outer spaces form another ring: 1–2–3–4–5–6–7–8–1. There are no direct middle-to-middle links: 40 ordinary links and 8 Nomad links total.
+Inner spaces also form a ring: 17–18–19–20–21–22–23–24–17. With Nomad, outer spaces form another ring: 1–2–3–4–5–6–7–8–1. Two players: no middle-to-middle links, 40 ordinary links and 8 Nomad links. Three players: Nomad also connects 9–10–11–12–13–14–15–16–9, for 40 ordinary and 16 Nomad links.
+
+**MAP-02 — Four-player graph.** Outer spaces 1–10, middle 11–20, inner 21–30. For index i from 0 through 9 (indices wrap modulo 10), outer i connects to middle i and i−1; middle i connects to inner i and i+1. Neighboring inner spaces connect normally; neighboring outer and middle spaces require Nomad. Total: 50 ordinary and 20 Nomad links. Exact coordinates and links are in `board-maps.mjs`.
 
 ## 8. Building, resting and cities
 
@@ -155,7 +157,7 @@ Inner spaces also form a ring: 17–18–19–20–21–22–23–24–17. With 
 | Mangrove | 8 population | 5 population | 0 population |
 | Caldera | 12 population | 9 population | 0 population |
 
-Every entry also requires 1 AP. Tent Culture subtracts a flat 3 population from building; it does not halve costs and does not reduce attack or city costs. There is no per-tribe settlement-piece cap beyond the 24 spaces. Settlement ownership is changed by conquest; there is no sell, abandon or demolish action.
+Every entry also requires 1 AP. Tent Culture subtracts a flat 3 population from building; it does not halve costs and does not reduce attack or city costs. There is no per-tribe settlement-piece cap beyond the board spaces. Settlement ownership is changed by conquest; there is no sell, abandon or demolish action.
 
 **REST-01 — Rest. Confirmed limit.** Pay 1 AP for +1 population and +1 knowledge, once per own turn. Rest does not end the turn. A second rest is illegal even after gaining extra AP. The allowance resets at the start of the next own turn.
 
@@ -163,7 +165,7 @@ Every entry also requires 1 AP. Tent Culture subtracts a flat 3 population from 
 
 **CITY-01 — Upgrade. Confirmed costs.** Research City once for 10 knowledge. Then own City technology, stand on your own ordinary settlement, have fewer than two cities, and spend 1 AP plus 10 population. The settlement becomes a city; it still counts as one settlement. This cost is identical in all environments and unaffected by Tent Culture.
 
-**CITY-02 — City effects. Source.** A city adds +1 defense, grants a possible City victory, and retains the tile's original income. The owner may have at most two cities at once. There is no further upgrade or additional upkeep.
+**CITY-02 — City effects. Source.** A city adds +2 defense with three or four players, or +1 with two players, grants a possible City victory, and retains the tile's original income. The owner may have at most two cities at once. There is no further upgrade or additional upkeep.
 
 **CITY-03 — Capture. Source.** A successful attack destroys the city upgrade and transfers the underlying ordinary settlement to the attacker. The attacker receives no intact city, upgrade refund or city-construction bonus. Losing City technology alone does not destroy an existing city or cancel its victory eligibility.
 
@@ -180,7 +182,7 @@ Every entry also requires 1 AP. Tent Culture subtracts a flat 3 population from 
 | Hunter | +1 | Gatherer | +1 |
 | Ferocity | +2 | War Tribe | +2 |
 | War Tribe | +2 | Defending leader present | +1 |
-| War Cry in purchase turn | +3 | City | +1 |
+| War Cry in purchase turn | +3 | City | +2 with three/four players; +1 with two |
 | Each 2 population committed | +1 | Each 2 population committed | +1 |
 | Earlier attacks | No penalty | Beach / mangrove / caldera | +1 / +2 / +3 |
 
@@ -278,7 +280,7 @@ The Fox correction began in revision `2.2-fox-copy-2026-10-11`. New games and su
 
 ## 12. Victory and game end
 
-**WIN-01 — Settler. Source.** Own at least six settlements at once and continuously retain at least six until the beginning of your next own turn. Cities count toward the six. You may own more than six and lose some while remaining above the threshold. Dropping below six cancels the claim immediately. Regaining six creates a new claim; the earlier holding period does not count.
+**WIN-01 — Settler. Confirmed.** Own and continuously hold at least five settlements with four players, or six with two/three players, until your next own turn. Cities count as settlements. Falling below the target cancels the claim immediately; regaining it starts a new holding period.
 
 **WIN-02 — City. Source.** Upgrade at least one settlement to a city and keep that particular city's ownership and upgrade intact until the beginning of your next own turn. The game tracks each city separately. Losing one does not cancel the claim on another continuously held city. Capturing an enemy city grants only a regular settlement, so that capture does not itself qualify for City victory.
 
@@ -286,7 +288,11 @@ The Fox correction began in revision `2.2-fox-copy-2026-10-11`. New games and su
 
 **WIN-04 — Kingmaker. Confirmed.** Immediately win after personally capturing cities at two different board locations during their owners’ holding periods (before their next own turns). Track location IDs permanently for this match. Recapturing a rebuilt city at the same location does not give a second credit. Destroying two cities belonging to the same opponent is valid if they occupy different locations. Ordinary settlements do not count. The captured city becomes an ordinary settlement as usual.
 
-**WIN-05 — Science. Confirmed.** Immediately win upon holding at least 40 unspent knowledge. The threshold is checked after every successful action and turn-start income. It is not cumulative lifetime knowledge and requires no cards or purchase. Knowledge earned from income, Rest, Tribute, Wise Owl or Spoils of War counts.
+**WIN-05 — Science. Confirmed.** Three/four players: complete one Beach Library, one Mangrove Library and one Caldera Library; win immediately on the third. Research City first (10 knowledge), then each separate library technology (8 knowledge, 0 AP). Construction requires the leader on an owned settlement of that biome, the matching research, and 1 AP; costs 0 population and 0 additional knowledge. A city building is not required. Two players: Science remains an immediate win at 40 unspent knowledge, checked after actions and turn income; libraries are unavailable.
+
+**LIBRARY-01 — Permanent credit.** Each player may build at most one library per biome. Completed libraries remain permanently with their builder after any settlement capture; they cannot be destroyed or transferred. Another player may build their own library on that same settlement after taking ownership. Libraries add no defense, income, settlement count or Kingmaker credit. Previously completed libraries need not be on currently owned settlements to win.
+
+**LIBRARY-02 — Research and Cunning Fox.** Each of Beach Library, Mangrove Library and Caldera Library requires City. Research costs 8 knowledge and no AP. Cunning Fox may copy eligible library research for free while the source retains it; copied research never grants a completed library. Owning all three technologies alone does not win.
 
 **WIN-06 — Resolution order. Digital tie handling.** Settler and City are checked before income at the beginning of the eligible tribe’s next turn; if both apply, the label is Settler. Immediate Science and Kingmaker are checked after successful actions or income. If the same action qualifies that player for both immediate conditions, the label is Kingmaker. No further actions or income occur after victory. No shared victory, elimination victory, score tiebreak or draw is implemented.
 
@@ -302,7 +308,7 @@ The Fox correction began in revision `2.2-fox-copy-2026-10-11`. New games and su
 
 **EXAMPLE-05 — Nomad rest.** With Nomad and 3 AP, rest gives +1 population and +1 knowledge, leaving 2 AP. You can use those AP but cannot rest again this turn, even after Swift Jaguar.
 
-**EXAMPLE-06 — Immediate Science.** At 36 knowledge, play Wise Owl for +4. The balance becomes 40 and the match ends immediately with Science victory; there is no opportunity to spend the knowledge first.
+**EXAMPLE-06 — Two-player immediate Science.** At 36 knowledge, play Wise Owl for +4. The balance becomes 40 and the match ends immediately with Science victory; there is no opportunity to spend the knowledge first.
 
 **EXAMPLE-07 — Kingmaker locations.** Capture a pending city at space 3: one credit. Capture a rebuilt city at space 3: still one. Capture another pending city at space 19: two credits and immediate Kingmaker victory.
 
@@ -312,7 +318,7 @@ These are digital strategy settings, not restrictions on human play. All persona
 
 **AI-01 — Setup.** Choose a beach as far as possible, by squared straight-line distance, from the nearest already-placed leader. If nobody has arrived, rank beaches randomly. This is a placement heuristic, not a path-distance calculation.
 
-**AI-02 — Personalities and research order.** Consider the first technology in the relevant list that is not currently owned. Purchase it only if affordable, eligible and current knowledge is below 30; at 30 or more, stop research to save toward Science. The current lists are fixed:
+**AI-02 — Personalities and research order.** Consider the first technology in the relevant list that is not currently owned. Purchase it if affordable and eligible. Only in two-player games, stop at 30 knowledge to save toward the 40-knowledge Science threshold. The current lists are fixed:
 
 | Personality | Leaders | Research priorities, in order |
 | --- | --- | --- |
@@ -356,7 +362,7 @@ The AI uses these heuristics, not a full strategic search or an external AI serv
 
 Hard purchases use the actual spirit-card price. Ordinary purchasing preserves 8 population for Tao and Daikotei or 15 for other leaders; purchasing while protecting a victory claim preserves 10 population. These reserves are unchanged by Daikotei’s discount.
 
-Hard evaluates routes after every action. Starting positions consider affordability, nearby cheap spaces and leader preferences. Ku favors proximity for early raids; economic leaders put more value on affordable richer biomes. Unrevealed yields use biome averages, never their actual hidden values. Capture value includes income gained and denied, Spoils and Spirit Favor rewards, and progress toward six settlements. Bots consider combat improvements before an immediately reachable raid. At 30 or more knowledge, if two turns of current income can reach 40, they stop buying research to preserve a Science victory. They immediately use Owl at 36 knowledge or rest at 39 when legal.
+Hard evaluates routes after every action. Starting positions consider affordability, nearby cheap spaces and leader preferences. Ku favors proximity for early raids; economic leaders put more value on affordable richer biomes. Unrevealed yields use biome averages, never their actual hidden values. Capture value includes income gained and denied, Spoils and Spirit Favor rewards, and progress toward the player-count settlement target. Bots consider combat improvements before an immediately reachable raid. In two-player games, at 30 or more knowledge, if two turns of current income can reach 40, they stop buying research to preserve a Science victory. Two-player bots immediately use Owl at 36 knowledge or rest at 39 when legal. Three/four-player bots instead consider library research and construction, preserve completed library credit, prioritize a third library, and attempt to deny a rival an unbuilt final biome. Standard/Relaxed bots can also research and build libraries. This does not include the proposed future multi-turn Science planner.
 
 **AI-08 — Leader playstyles (October 9, 2026).** The six supplied human audits inform preferences rather than fixed move sequences. Every leader adapts to the public position and can take a favorable attack or alternative victory.
 
@@ -395,7 +401,7 @@ These are recorded for review; none of the alternatives below has been applied.
 | --- | --- | --- |
 | REVIEW-01 | Tile composition | Five population and five knowledge tiles per environment; confirm exact counts and yield values. |
 | REVIEW-02 | Dice — resolved | Base D6 + D4; Archery/Shields 2D6, confirmed by Brett. |
-| REVIEW-03 | Boats and hidden trails | Nomad opens all eight coastal links; clarify boat numbers and verify the full adjacency table. |
+| REVIEW-03 | Boats and hidden trails | Two players: 8 coastal links. Three players: 8 outer + 8 middle. Four players: 10 outer + 10 middle. All cost 1 AP; boat numbers remain unused. |
 | REVIEW-04 | Spirit deck | Six copies of each of six types; confirm quantities and discard recycling. |
 | REVIEW-05 | Nomad rest — resolved | All players use the same 1 AP, once-per-turn rest; it does not end the turn. |
 | REVIEW-06 | Arrival order | All tribes sorted by D6 result, with player-ID tie resolution; decide whether to use the PDF's clockwise sequence and rerolls. |
@@ -449,7 +455,9 @@ Useful change-request format: **Rule ID / proposed value or behavior / reason / 
 
 The living source is `RULES.md`. The browser reading copy is generated from it; update the source and regenerate the reading copy when revising the rules.
 
-## 18. Revision decisions implemented in edition 2
+## 18. Historical revision decisions implemented in edition 2
+
+The following records the earlier edition. Edition 3 overrides the board, victory and city-defense rules as specified above.
 
 - The authoritative technology asset is `Kn Tree - Current (5).png`. Armor is withdrawn. All 22 costs and prerequisite links have been checked against it.
 - Brett’s dice clarification overrides the image: base D6 + D4; Archery/Shields 2D6.
@@ -462,3 +470,20 @@ The living source is `RULES.md`. The browser reading copy is generated from it; 
 - Public commitment confirmations, reserve-based computer bidding, and charging both finalized commitments even when Turtle resolves combat are documented digital procedures for playtesting.
 
 Earlier document versions and the pre-update engine are preserved in `rules-history/`.
+
+## 19. Edition 3 deployment and player-count summary
+
+| Rule | Two players | Three players | Four players |
+| --- | --- | --- | --- |
+| Tiles | 24 random from 30 | 24 random from 30 | All 30, 10 per biome |
+| Nomad links | Outer ring | Outer and middle | Outer and middle |
+| Held settlement target | 6 | 6 | 5 |
+| City research | 10 knowledge | 10 knowledge | 10 knowledge |
+| City construction | 10 population + 1 AP | 10 population + 1 AP | 10 population + 1 AP |
+| City defense | +1 | +2 | +2 |
+| Science | 40 knowledge immediately | Three permanent biome libraries immediately | Three permanent biome libraries immediately |
+| Library research | Unavailable | 8 knowledge per biome after City | 8 knowledge per biome after City |
+
+These changes apply to new matches. Earlier single-player saves remain available for audit export, but cannot resume under a different game version. Earlier multiplayer rooms retain their stored records and require their original server version to resume. Create a new room for edition 3. Cunning Fox, leader stats, all other technology costs, combat and the once-per-turn rest rule remain unchanged.
+
+The yellow city-price alternatives were explicitly declined: the live city upgrade stays at 10 population. The tested Asinya/Hecatl/Tao starting-resource changes were not adopted. The 30-tile map and five-settlement target apply only to four players.
